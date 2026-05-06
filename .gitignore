@@ -1,0 +1,35 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tooling / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+tmp/
+temp/
+
+# Large optional raw data drops (keep folder structure)
+medical-peft/data/raw/**/*.zip
+medical-peft/data/raw/**/*.gz
+medical-peft/data/raw/**/*.tar
+medical-peft/data/raw/**/*.bz2
