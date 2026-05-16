@@ -7,11 +7,12 @@
 | 2026-05-16 | Añadir `doc_type`, `content_role`, `topics` | Permite auditar cobertura y seleccionar chunks accionables para QA | `build_report.json` y `audit_report.json` |
 | 2026-05-16 | Añadir dedupe audit | Se necesitaba visibilidad explícita de duplicados inter-PDF | `dedupe_audit` en `build_report.json` |
 | 2026-05-16 | Añadir `qa_id` y reporte de grounding | Hace trazable cada QA y permite filtrar respuestas poco apoyadas | `generate_synthetic_qa.py` |
-| 2026-05-16 | Renombrar carpeta raw a `raw_data/obstetrics/` | `obstetrics/` contenía datos fuente, no código ni artefactos procesados | Estructura del repo más clara |
+| 2026-05-16 | Renombrar carpeta raw a `pdfs/obstetrics/` y artefactos a `artifacts/obstetrics/` | Separar insumos fuente de salidas del pipeline y evitar rutas ambiguas como `data/` | Estructura del repo más clara |
 
 ## Convenciones vigentes
 
-- `raw_data/` = insumos fuente inmutables o casi inmutables.
-- `data/` = artefactos derivados del pipeline.
+- `pdfs/` = insumos fuente inmutables o casi inmutables.
+- `artifacts/` = salidas intermedias del pipeline, reportes y manifests.
+- `datasets/` = salidas listas para entrenamiento.
 - `docs/research_notes/` = decisiones, estado y evaluación del proyecto.
 - No escalar volumen antes de verificar calidad, trazabilidad y evaluación.

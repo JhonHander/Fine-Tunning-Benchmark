@@ -7,8 +7,9 @@ El proyecto construye un corpus en español para **SFT Q+A** a partir de PDFs cl
 | Área | Estado actual |
 |---|---|
 | Objetivo principal | SFT Q+A en español |
-| Datos raw | `raw_data/obstetrics/spanish/` |
-| Particiones LM | `train_lm.jsonl`, `validation_lm.jsonl` |
+| PDFs fuente | `pdfs/obstetrics/` |
+| Artefactos | `artifacts/obstetrics/` |
+| Particiones LM | `datasets/obstetrics/lm/train_lm.jsonl`, `validation_lm.jsonl` |
 | Riesgo de leakage por PDF | Controlado con split por documento |
 | Calidad actual | Útil para piloto; aún requiere validación humana y benchmark propio |
 | Próximo salto de madurez | QA sintético auditado + benchmark interno |

@@ -5,11 +5,11 @@ Este documento describe el pipeline activo del proyecto. Los pipelines antiguos 
 ## Flujo Principal
 
 ```text
-PDFs en raw_data/obstetrics/spanish
+PDFs en pdfs/obstetrics
   -> extracción por página
   -> limpieza clínica
   -> segmentación en chunks
-  -> train_lm.jsonl / validation_lm.jsonl / test_lm.jsonl
+  -> datasets/obstetrics/lm/train_lm.jsonl / validation_lm.jsonl / test_lm.jsonl
   -> QA sintético opcional
 ```
 
@@ -18,7 +18,7 @@ PDFs en raw_data/obstetrics/spanish
 Uso normal cuando agregas PDFs nuevos:
 
 ```bash
-python scripts/obstetrics/run_incremental.py
+python scripts/run_incremental.py
 ```
 
 Características:
@@ -27,15 +27,15 @@ Características:
 - Procesa solo esos PDFs.
 - Reemplaza registros previos si un PDF cambió.
 - Hace append de chunks aceptados a los JSONL existentes.
-- Mantiene el manifiesto `data/obstetrics_spanish/processed_pdfs_manifest.json`.
+- Mantiene el manifiesto `artifacts/obstetrics/processed_pdfs_manifest.json`.
 
 Opciones:
 
 ```bash
-python scripts/obstetrics/run_incremental.py --recursive
-python scripts/obstetrics/run_incremental.py --force
-python scripts/obstetrics/run_incremental.py --keep-temp
-python scripts/obstetrics/run_incremental.py --input-dir path/to/pdfs
+python scripts/run_incremental.py --recursive
+python scripts/run_incremental.py --force
+python scripts/run_incremental.py --keep-temp
+python scripts/run_incremental.py --input-dir path/to/pdfs
 ```
 
 ## Reconstrucción Completa
@@ -43,7 +43,7 @@ python scripts/obstetrics/run_incremental.py --input-dir path/to/pdfs
 Úsalo cuando cambies reglas de limpieza/chunking o quieras reproducir todo desde cero:
 
 ```bash
-python scripts/obstetrics/run_full_pipeline.py
+python scripts/run_full_pipeline.py
 ```
 
 ## Pasos Internos
@@ -51,22 +51,22 @@ python scripts/obstetrics/run_full_pipeline.py
 Los runners llaman internamente:
 
 ```bash
-python scripts/obstetrics/extract_pdfs.py
-python scripts/obstetrics/clean_text.py
-python scripts/obstetrics/build_lm_dataset.py
-python scripts/obstetrics/audit_dataset.py
+python scripts/extract_pdfs.py
+python scripts/clean_text.py
+python scripts/build_lm_dataset.py
+python scripts/audit_dataset.py
 ```
 
 ## Salidas LM
 
 ```text
-data/obstetrics_spanish/raw_pages.jsonl
-data/obstetrics_spanish/clean_pages.jsonl
-data/obstetrics_spanish/chunks.jsonl
-data/obstetrics_spanish/train_lm.jsonl
-data/obstetrics_spanish/validation_lm.jsonl
-data/obstetrics_spanish/test_lm.jsonl
-data/obstetrics_spanish/audit_report.json
+artifacts/obstetrics/raw_pages.jsonl
+artifacts/obstetrics/clean_pages.jsonl
+artifacts/obstetrics/chunks.jsonl
+datasets/obstetrics/lm/train_lm.jsonl
+datasets/obstetrics/lm/validation_lm.jsonl
+datasets/obstetrics/lm/test_lm.jsonl
+artifacts/obstetrics/audit_report.json
 ```
 
 Formato:
@@ -80,23 +80,23 @@ Formato:
 Dry run:
 
 ```bash
-python scripts/obstetrics/generate_synthetic_qa.py --dry-run --limit 5
+python scripts/generate_synthetic_qa.py --dry-run --limit 5
 ```
 
 Generación real:
 
 ```bash
 set OPENAI_API_KEY=your_key_here
-python scripts/obstetrics/generate_synthetic_qa.py --limit 20
+python scripts/generate_synthetic_qa.py --limit 20
 ```
 
 Salidas:
 
 ```text
-data/obstetrics_spanish/synthetic_qa_raw.jsonl
-data/obstetrics_spanish/synthetic_qa_sft.jsonl
-data/obstetrics_spanish/.qa_generation_progress.json
-data/obstetrics_spanish/qa_generation_report.json
+datasets/obstetrics/qa/synthetic_qa_raw.jsonl
+datasets/obstetrics/qa/synthetic_qa_sft.jsonl
+datasets/obstetrics/qa/.qa_generation_progress.json
+datasets/obstetrics/qa/qa_generation_report.json
 ```
 
 Formato SFT:

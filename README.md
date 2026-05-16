@@ -2,10 +2,10 @@
 
 Pipeline para construir datasets de entrenamiento a partir de PDFs de obstetricia y ginecología.
 
-El proyecto ahora se centra en una sola fuente de conocimiento raw:
+El proyecto ahora se centra en una sola fuente de conocimiento fuente:
 
 ```text
-raw_data/obstetrics/spanish/*.pdf
+pdfs/obstetrics/*.pdf
 ```
 
 Y produce dos tipos de datos:
@@ -18,16 +18,27 @@ Y produce dos tipos de datos:
 ## Estructura
 
 ```text
-data/
-  obstetrics_spanish/
+artifacts/
+  obstetrics/
     raw_pages.jsonl
     clean_pages.jsonl
     chunks.jsonl
-    train_lm.jsonl
-    validation_lm.jsonl
-    test_lm.jsonl
+    tables.jsonl
+    inventory.json
+    cleaning_report.json
+    build_report.json
     audit_report.json
     processed_pdfs_manifest.json
+
+datasets/
+  obstetrics/
+    lm/
+      train_lm.jsonl
+      validation_lm.jsonl
+      test_lm.jsonl
+    qa/
+      synthetic_qa_raw.jsonl
+      synthetic_qa_sft.jsonl
 
 docs/
   obstetrics_lm_pipeline.md
@@ -37,23 +48,20 @@ docs/
     02_decisiones_tecnicas.md
     03_plan_evaluacion_y_benchmark.md
 
-raw_data/
+pdfs/
   obstetrics/
-    spanish/
-      *.pdf
-    english/
-      *.pdf
+    *.pdf
 
 scripts/
-  obstetrics/
-    run_incremental.py
-    run_full_pipeline.py
-    generate_synthetic_qa.py
-    extract_pdfs.py
-    clean_text.py
-    build_lm_dataset.py
-    audit_dataset.py
-    utils.py
+  run_incremental.py
+  run_full_pipeline.py
+  generate_synthetic_qa.py
+  extract_pdfs.py
+  clean_text.py
+  build_lm_dataset.py
+  audit_dataset.py
+  extract_tables.py
+  utils.py
 ```
 
 ## Instalación
@@ -67,34 +75,34 @@ pip install -r requirements.txt
 Copia los PDFs nuevos en:
 
 ```text
-raw_data/obstetrics/spanish/
+pdfs/obstetrics/
 ```
 
 Luego ejecuta el pipeline incremental:
 
 ```bash
-python scripts/obstetrics/run_incremental.py
+python scripts/run_incremental.py
 ```
 
 Este comando procesa solo PDFs nuevos o modificados y actualiza:
 
 ```text
-data/obstetrics_spanish/chunks.jsonl
-data/obstetrics_spanish/train_lm.jsonl
-data/obstetrics_spanish/validation_lm.jsonl
-data/obstetrics_spanish/test_lm.jsonl
+artifacts/obstetrics/chunks.jsonl
+datasets/obstetrics/lm/train_lm.jsonl
+datasets/obstetrics/lm/validation_lm.jsonl
+datasets/obstetrics/lm/test_lm.jsonl
 ```
 
 Para buscar PDFs dentro de subcarpetas:
 
 ```bash
-python scripts/obstetrics/run_incremental.py --recursive
+python scripts/run_incremental.py --recursive
 ```
 
 Para forzar reprocesamiento incremental de todos los PDFs descubiertos:
 
 ```bash
-python scripts/obstetrics/run_incremental.py --force
+python scripts/run_incremental.py --force
 ```
 
 ## Reconstruir Todo
@@ -102,7 +110,7 @@ python scripts/obstetrics/run_incremental.py --force
 Si quieres regenerar todos los artefactos desde cero:
 
 ```bash
-python scripts/obstetrics/run_full_pipeline.py
+python scripts/run_full_pipeline.py
 ```
 
 ## Generar QA Sintético
@@ -110,29 +118,29 @@ python scripts/obstetrics/run_full_pipeline.py
 Primero estima costo y cantidad de pares sin llamar a la API:
 
 ```bash
-python scripts/obstetrics/generate_synthetic_qa.py --dry-run --limit 5
+python scripts/generate_synthetic_qa.py --dry-run --limit 5
 ```
 
 Para generar una muestra real:
 
 ```bash
 set OPENAI_API_KEY=tu_api_key
-python scripts/obstetrics/generate_synthetic_qa.py --limit 20
+python scripts/generate_synthetic_qa.py --limit 20
 ```
 
 Para generar sobre todo `train_lm.jsonl`:
 
 ```bash
-python scripts/obstetrics/generate_synthetic_qa.py
+python scripts/generate_synthetic_qa.py
 ```
 
 Salidas:
 
 ```text
-data/obstetrics_spanish/synthetic_qa_raw.jsonl
-data/obstetrics_spanish/synthetic_qa_sft.jsonl
-data/obstetrics_spanish/.qa_generation_progress.json
-data/obstetrics_spanish/qa_generation_report.json
+datasets/obstetrics/qa/synthetic_qa_raw.jsonl
+datasets/obstetrics/qa/synthetic_qa_sft.jsonl
+datasets/obstetrics/qa/.qa_generation_progress.json
+datasets/obstetrics/qa/qa_generation_report.json
 ```
 
 ## Formatos
@@ -154,7 +162,7 @@ QA/SFT:
 Después de cada corrida revisa:
 
 ```text
-data/obstetrics_spanish/audit_report.json
+artifacts/obstetrics/audit_report.json
 ```
 
 Ahí quedan conteos, páginas descartadas, páginas que requieren OCR, distribución por PDF y muestras para revisión manual.
