@@ -145,6 +145,11 @@ Reglas estrictas:
 8. Las preguntas deben quedar limpias y autocontenidas: NO escribas frases como
    "según el texto", "según el fragmento", "de acuerdo con el fragmento",
    "con base en el texto", "según la tabla" ni expresiones equivalentes.
+9. Cada pregunta debe contener UNA sola demanda central. Evita preguntas dobles
+   unidas por "y", "además", "cuál es... y por qué...", etc. Si dos ideas merecen
+   preguntarse, conviértelas en dos pares separados solo cuando cada una sea útil por sí misma.
+10. No sacrifiques calidad por cantidad. Genera solo pares que el fragmento soporte bien;
+    evita forzar tipos o preguntas adicionales si el contenido no lo permite.
 """
 
 # Template del mensaje de usuario enviado a GPT por cada chunk.
@@ -156,8 +161,8 @@ Sección: {section}
 {text}
 </contexto>
 
-Genera exactamente {n_pairs} pares de pregunta-respuesta en español basados en el \
-fragmento anterior.
+Genera hasta {n_pairs} pares de pregunta-respuesta en español basados en el \
+fragmento anterior. Si el fragmento solo permite menos pares de alta calidad, genera menos.
 """
 
 ROUNDTRIP_SYSTEM_PROMPT = """\
