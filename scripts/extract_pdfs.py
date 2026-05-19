@@ -18,7 +18,8 @@ from document_manifest import (
 )
 from utils import (
     clean_extracted_text,
-    default_artifacts_dir,
+    default_corpus_dir,
+    default_metadata_dir,
     default_pdfs_dir,
     project_root,
     slugify,
@@ -28,13 +29,13 @@ from utils import (
 
 
 def parse_args() -> argparse.Namespace:
-    root = project_root()
-    artifacts_dir = default_artifacts_dir()
+    corpus_dir = default_corpus_dir()
+    metadata_dir = default_metadata_dir()
     pdfs_dir = default_pdfs_dir()
     parser = argparse.ArgumentParser(description="Extract raw text pages from Spanish obstetrics PDFs.")
     parser.add_argument("--input-dir", type=Path, default=pdfs_dir)
-    parser.add_argument("--output", type=Path, default=artifacts_dir / "raw_pages.jsonl")
-    parser.add_argument("--inventory-output", type=Path, default=artifacts_dir / "inventory.json")
+    parser.add_argument("--output", type=Path, default=corpus_dir / "raw_pages.jsonl")
+    parser.add_argument("--inventory-output", type=Path, default=metadata_dir / "inventory.json")
     parser.add_argument("--min-fallback-chars", type=int, default=120)
     parser.add_argument("--min-ocr-chars", type=int, default=80)
     parser.add_argument("--recursive", action=argparse.BooleanOptionalAction, default=False)

@@ -191,6 +191,22 @@ def default_artifacts_dir() -> Path:
     return project_root() / "artifacts" / "obstetrics"
 
 
+def default_corpus_dir() -> Path:
+    return default_artifacts_dir() / "corpus"
+
+
+def default_tables_dir() -> Path:
+    return default_artifacts_dir() / "tables"
+
+
+def default_metadata_dir() -> Path:
+    return default_artifacts_dir() / "metadata"
+
+
+def default_reports_dir() -> Path:
+    return default_artifacts_dir() / "reports"
+
+
 def default_datasets_dir() -> Path:
     return project_root() / "datasets" / "obstetrics"
 
@@ -223,8 +239,9 @@ DOC_TYPES = ("gpc", "protocol", "manual", "article", "book", "guide", "unknown")
 def classify_doc_type_from_filename(filename: str) -> str:
     """Infer document type from filename using keyword heuristics.
 
-    Note: For content-based classification, use classify_doc_type_from_text()
-    from document_manifest module instead.
+    Use this fallback when content text is unavailable. Prefer
+    classify_doc_type_from_text() from document_manifest for content-aware
+    classification.
     """
     normalized = normalize_for_compare(filename)
     normalized = re.sub(r"[_\-+.]", " ", normalized)
@@ -864,7 +881,7 @@ def strip_lm_noise(text: str) -> str:
         line_stripped = line.strip()
         if not line_stripped:
             continue
-        # Remove pure index leaders like "CAPÍTULO ... ....... 23"
+        # Remove table-of-contents leaders made of headings, dot runs, and page numbers.
         if TOC_DOT_LEADER_RE.search(line_stripped):
             if len(line_stripped) >= 40:
                 continue
@@ -915,23 +932,23 @@ SECTION_TYPE_TO_CONTENT_ROLE = {
 
 
 def classify_section_type(section_heading: str, text_sample: str = "") -> str:
-    """Clasifica el tipo de sección basado en el título y contenido."""
+    """Classify a section from its heading first, then from its opening text."""
     normalized_heading = normalize_for_compare(section_heading)
     normalized_text = normalize_for_compare(text_sample[:1500])
 
-    # Primero verificar el heading
+    # Headings are the strongest signal because they usually state the section role directly.
     for section_type, keywords in SECTION_TYPE_KEYWORDS.items():
         for keyword in keywords:
             if keyword in normalized_heading:
                 return section_type
 
-    # Si no match en heading, verificar inicio del texto
+    # Fall back to the first paragraphs; later text can drift into unrelated subtopics.
     for section_type, keywords in SECTION_TYPE_KEYWORDS.items():
         for keyword in keywords:
             if keyword in normalized_text[:500]:
                 return section_type
 
-    # Default: si tiene score clínico alto, es clinical_content
+    # A high clinical score is still useful when headings are missing or noisy.
     if clinical_score(text_sample[:1000]) >= 5:
         return "clinical_content"
 
@@ -939,11 +956,12 @@ def classify_section_type(section_heading: str, text_sample: str = "") -> str:
 
 
 def classify_content_role(text: str, section_type: str = "") -> str:
-    """Clasifica el rol del contenido (evidence, recommendation, procedure, etc.)"""
+    """Classify the content role, such as evidence, recommendation, or procedure."""
     normalized = normalize_for_compare(text[:2000])
     default_role = SECTION_TYPE_TO_CONTENT_ROLE.get(section_type, "")
 
-    # Verificar keywords de content_role
+    # Score role-specific keywords instead of stopping at the first match; medical
+    # sections often contain several overlapping concepts.
     scores: Dict[str, int] = {role: 0 for role in CONTENT_ROLE_KEYWORDS}
     for role, keywords in CONTENT_ROLE_KEYWORDS.items():
         for keyword in keywords:
@@ -953,14 +971,14 @@ def classify_content_role(text: str, section_type: str = "") -> str:
     if default_role:
         scores[default_role] += 2
 
-    # Si hay un ganador claro, devolverlo
+    # Require a clear winner so a single incidental keyword does not overclassify text.
     if scores:
         best_role = max(scores, key=scores.get)
         best_score = scores[best_role]
         if best_score >= 2 or (default_role and best_role == default_role and best_score >= 1):
             return best_role
 
-    # Fallback basado en clinical_score
+    # Use clinical density as a final fallback when keyword evidence is weak.
     score = clinical_score(text)
     if score >= 8:
         return "evidence"
@@ -1026,7 +1044,8 @@ def find_duplicate_documents(
 ) -> List[Tuple[str, str, float]]:
     """Find potential duplicate documents based on content similarity.
 
-    Returns list of (pdf_id_a, pdf_id_b, similarity) tuples.
+    Returns:
+        List of (pdf_id_a, pdf_id_b, similarity) tuples.
     """
     from difflib import SequenceMatcher
 
@@ -1126,22 +1145,21 @@ def split_train_validation_test_by_document(
     min_validation_pdfs: int = 3,
     min_test_pdfs: int = 3,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Split chunks into train/validation/test by DOCUMENT and approximate chunk volume.
+    """Split chunks by document while approximating target chunk volume.
 
-    This ensures NO DATA LEAKAGE - all chunks from the same PDF
-    go to exactly one split. Ratios target exported chunk volume rather than
-    only document count, avoiding a tiny number of large PDFs dominating
-    validation/test.
+    Keeping every PDF in exactly one split prevents leakage. Ratios target
+    exported chunk volume rather than document count so a few large PDFs do not
+    dominate validation or test.
 
     Args:
-        chunks: All chunks to split
-        validation_ratio: Approximate fraction of chunks to assign to validation
-        test_ratio: Approximate fraction of chunks to assign to test
-        seed: Random seed for reproducibility
-        stratify_by: Kept for API compatibility and report semantics
+        chunks: Chunks to split.
+        validation_ratio: Approximate chunk-volume fraction for validation.
+        test_ratio: Approximate chunk-volume fraction for test.
+        seed: Random seed for reproducibility.
+        stratify_by: Kept for API compatibility and report semantics.
 
     Returns:
-        (train_chunks, validation_chunks, test_chunks)
+        Tuple of (train_chunks, validation_chunks, test_chunks).
     """
     if validation_ratio < 0 or test_ratio < 0 or validation_ratio + test_ratio >= 1:
         raise ValueError("validation_ratio and test_ratio must be >= 0 and sum to < 1")

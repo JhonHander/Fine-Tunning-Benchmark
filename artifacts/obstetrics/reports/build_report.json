@@ -1,6 +1,6 @@
 {
-  "input": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/clean_pages.jsonl",
-  "chunks_output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/chunks.jsonl",
+  "input": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/corpus/clean_pages.jsonl",
+  "chunks_output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/corpus/chunks.jsonl",
   "train_output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/datasets/obstetrics/lm/train_lm.jsonl",
   "validation_output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/datasets/obstetrics/lm/validation_lm.jsonl",
   "test_output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/datasets/obstetrics/lm/test_lm.jsonl",

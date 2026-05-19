@@ -20,15 +20,24 @@ Y produce dos tipos de datos:
 ```text
 artifacts/
   obstetrics/
-    raw_pages.jsonl
-    clean_pages.jsonl
-    chunks.jsonl
-    tables.jsonl
-    inventory.json
-    cleaning_report.json
-    build_report.json
-    audit_report.json
-    processed_pdfs_manifest.json
+    corpus/
+      raw_pages.jsonl
+      clean_pages.jsonl
+      chunks.jsonl
+    tables/
+      tables.jsonl
+    metadata/
+      inventory.json
+      processed_pdfs_manifest.json
+      legacy/
+        inventory_enhanced.json
+    reports/
+      cleaning_report.json
+      build_report.json
+      audit_report.json
+      table_extraction_report.json
+    qa_experiments/
+    debug/
 
 datasets/
   obstetrics/
@@ -87,7 +96,7 @@ python scripts/run_incremental.py
 Este comando procesa solo PDFs nuevos o modificados y actualiza:
 
 ```text
-artifacts/obstetrics/chunks.jsonl
+artifacts/obstetrics/corpus/chunks.jsonl
 datasets/obstetrics/lm/train_lm.jsonl
 datasets/obstetrics/lm/validation_lm.jsonl
 datasets/obstetrics/lm/test_lm.jsonl
@@ -162,7 +171,7 @@ QA/SFT:
 Después de cada corrida revisa:
 
 ```text
-artifacts/obstetrics/audit_report.json
+artifacts/obstetrics/reports/audit_report.json
 ```
 
 Ahí quedan conteos, páginas descartadas, páginas que requieren OCR, distribución por PDF y muestras para revisión manual.

@@ -8,7 +8,9 @@ from typing import Any, Dict, List
 from utils import (
     clean_extracted_text,
     classify_page,
-    default_artifacts_dir,
+    default_corpus_dir,
+    default_metadata_dir,
+    default_reports_dir,
     extract_page_section,
     find_repeated_lines,
     get_excluded_pdf_ids,
@@ -21,12 +23,14 @@ from utils import (
 
 
 def parse_args() -> argparse.Namespace:
-    artifacts_dir = default_artifacts_dir()
+    corpus_dir = default_corpus_dir()
+    metadata_dir = default_metadata_dir()
+    reports_dir = default_reports_dir()
     parser = argparse.ArgumentParser(description="Clean extracted obstetrics PDF pages.")
-    parser.add_argument("--input", type=Path, default=artifacts_dir / "raw_pages.jsonl")
-    parser.add_argument("--output", type=Path, default=artifacts_dir / "clean_pages.jsonl")
-    parser.add_argument("--report-output", type=Path, default=artifacts_dir / "cleaning_report.json")
-    parser.add_argument("--inventory", type=Path, default=artifacts_dir / "inventory.json")
+    parser.add_argument("--input", type=Path, default=corpus_dir / "raw_pages.jsonl")
+    parser.add_argument("--output", type=Path, default=corpus_dir / "clean_pages.jsonl")
+    parser.add_argument("--report-output", type=Path, default=reports_dir / "cleaning_report.json")
+    parser.add_argument("--inventory", type=Path, default=metadata_dir / "inventory.json")
     parser.add_argument("--header-threshold-ratio", type=float, default=0.28)
     parser.add_argument("--include-dropped", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()

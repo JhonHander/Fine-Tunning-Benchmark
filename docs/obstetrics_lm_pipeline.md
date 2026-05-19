@@ -27,7 +27,7 @@ Características:
 - Procesa solo esos PDFs.
 - Reemplaza registros previos si un PDF cambió.
 - Hace append de chunks aceptados a los JSONL existentes.
-- Mantiene el manifiesto `artifacts/obstetrics/processed_pdfs_manifest.json`.
+- Mantiene el manifiesto `artifacts/obstetrics/metadata/processed_pdfs_manifest.json`.
 
 Opciones:
 
@@ -60,13 +60,13 @@ python scripts/audit_dataset.py
 ## Salidas LM
 
 ```text
-artifacts/obstetrics/raw_pages.jsonl
-artifacts/obstetrics/clean_pages.jsonl
-artifacts/obstetrics/chunks.jsonl
+artifacts/obstetrics/corpus/raw_pages.jsonl
+artifacts/obstetrics/corpus/clean_pages.jsonl
+artifacts/obstetrics/corpus/chunks.jsonl
 datasets/obstetrics/lm/train_lm.jsonl
 datasets/obstetrics/lm/validation_lm.jsonl
 datasets/obstetrics/lm/test_lm.jsonl
-artifacts/obstetrics/audit_report.json
+artifacts/obstetrics/reports/audit_report.json
 ```
 
 Formato:
@@ -93,10 +93,10 @@ python scripts/generate_synthetic_qa.py --limit 20
 Salidas:
 
 ```text
-datasets/obstetrics/qa/synthetic_qa_raw.jsonl
-datasets/obstetrics/qa/synthetic_qa_sft.jsonl
-datasets/obstetrics/qa/.qa_generation_progress.json
-datasets/obstetrics/qa/qa_generation_report.json
+datasets/obstetrics/qa/final/<split>/raw.jsonl
+datasets/obstetrics/qa/final/<split>/sft.jsonl
+datasets/obstetrics/qa/final/<split>/progress.json
+datasets/obstetrics/qa/final/<split>/generation_report.json
 ```
 
 Formato SFT:

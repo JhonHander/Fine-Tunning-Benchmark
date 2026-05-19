@@ -10,8 +10,10 @@ from utils import (
     assign_chunk_ids,
     chunk_records,
     dedupe_chunks,
-    default_artifacts_dir,
+    default_corpus_dir,
     default_datasets_dir,
+    default_metadata_dir,
+    default_reports_dir,
     enrich_chunks,
     filter_lm_chunks,
     read_jsonl,
@@ -23,16 +25,18 @@ from utils import (
 
 
 def parse_args() -> argparse.Namespace:
-    artifacts_dir = default_artifacts_dir()
+    corpus_dir = default_corpus_dir()
     datasets_dir = default_datasets_dir()
+    metadata_dir = default_metadata_dir()
+    reports_dir = default_reports_dir()
     parser = argparse.ArgumentParser(description="Build LM train/validation/test JSONL from cleaned obstetrics pages.")
-    parser.add_argument("--input", type=Path, default=artifacts_dir / "clean_pages.jsonl")
-    parser.add_argument("--inventory", type=Path, default=artifacts_dir / "inventory.json")
-    parser.add_argument("--chunks-output", type=Path, default=artifacts_dir / "chunks.jsonl")
+    parser.add_argument("--input", type=Path, default=corpus_dir / "clean_pages.jsonl")
+    parser.add_argument("--inventory", type=Path, default=metadata_dir / "inventory.json")
+    parser.add_argument("--chunks-output", type=Path, default=corpus_dir / "chunks.jsonl")
     parser.add_argument("--train-output", type=Path, default=datasets_dir / "lm" / "train_lm.jsonl")
     parser.add_argument("--validation-output", type=Path, default=datasets_dir / "lm" / "validation_lm.jsonl")
     parser.add_argument("--test-output", type=Path, default=datasets_dir / "lm" / "test_lm.jsonl")
-    parser.add_argument("--build-report-output", type=Path, default=artifacts_dir / "build_report.json")
+    parser.add_argument("--build-report-output", type=Path, default=reports_dir / "build_report.json")
     parser.add_argument("--min-tokens", type=int, default=500)
     parser.add_argument("--max-tokens", type=int, default=1200)
     parser.add_argument("--overlap-tokens", type=int, default=80)

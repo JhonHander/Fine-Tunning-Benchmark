@@ -7,22 +7,32 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List
 
-from utils import default_artifacts_dir, default_datasets_dir, load_inventory_manifest, read_jsonl, write_json
+from utils import (
+    default_corpus_dir,
+    default_datasets_dir,
+    default_metadata_dir,
+    default_reports_dir,
+    load_inventory_manifest,
+    read_jsonl,
+    write_json,
+)
 
 
 def parse_args() -> argparse.Namespace:
-    artifacts_dir = default_artifacts_dir()
+    corpus_dir = default_corpus_dir()
     datasets_dir = default_datasets_dir()
+    metadata_dir = default_metadata_dir()
+    reports_dir = default_reports_dir()
     parser = argparse.ArgumentParser(description="Audit the Spanish obstetrics LM dataset artifacts.")
-    parser.add_argument("--raw-pages", type=Path, default=artifacts_dir / "raw_pages.jsonl")
-    parser.add_argument("--clean-pages", type=Path, default=artifacts_dir / "clean_pages.jsonl")
-    parser.add_argument("--chunks", type=Path, default=artifacts_dir / "chunks.jsonl")
+    parser.add_argument("--raw-pages", type=Path, default=corpus_dir / "raw_pages.jsonl")
+    parser.add_argument("--clean-pages", type=Path, default=corpus_dir / "clean_pages.jsonl")
+    parser.add_argument("--chunks", type=Path, default=corpus_dir / "chunks.jsonl")
     parser.add_argument("--train", type=Path, default=datasets_dir / "lm" / "train_lm.jsonl")
     parser.add_argument("--validation", type=Path, default=datasets_dir / "lm" / "validation_lm.jsonl")
     parser.add_argument("--test", type=Path, default=datasets_dir / "lm" / "test_lm.jsonl")
-    parser.add_argument("--inventory", type=Path, default=artifacts_dir / "inventory.json")
-    parser.add_argument("--table-report", "--tables-report", dest="table_report", type=Path, default=artifacts_dir / "table_extraction_report.json")
-    parser.add_argument("--output", type=Path, default=artifacts_dir / "audit_report.json")
+    parser.add_argument("--inventory", type=Path, default=metadata_dir / "inventory.json")
+    parser.add_argument("--table-report", "--tables-report", dest="table_report", type=Path, default=reports_dir / "table_extraction_report.json")
+    parser.add_argument("--output", type=Path, default=reports_dir / "audit_report.json")
     parser.add_argument("--samples-per-pdf", type=int, default=5)
     parser.add_argument("--sample-chars", type=int, default=700)
     parser.add_argument("--seed", type=int, default=42)

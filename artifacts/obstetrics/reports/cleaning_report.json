@@ -1,6 +1,6 @@
 {
-  "input": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/raw_pages.jsonl",
-  "output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/clean_pages.jsonl",
+  "input": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/corpus/raw_pages.jsonl",
+  "output": "/home/jhonh/Code/MinCiencias/Fine-Tunning-Benchmark/artifacts/obstetrics/corpus/clean_pages.jsonl",
   "total_pages": 5856,
   "excluded_skipped": 20,
   "written_pages": 5836,
