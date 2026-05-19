@@ -7,22 +7,32 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List
 
-from utils import default_artifacts_dir, default_datasets_dir, load_inventory_manifest, read_jsonl, write_json
+from utils import (
+    default_corpus_dir,
+    default_datasets_dir,
+    default_metadata_dir,
+    default_reports_dir,
+    load_inventory_manifest,
+    read_jsonl,
+    write_json,
+)
 
 
 def parse_args() -> argparse.Namespace:
-    artifacts_dir = default_artifacts_dir()
+    corpus_dir = default_corpus_dir()
     datasets_dir = default_datasets_dir()
+    metadata_dir = default_metadata_dir()
+    reports_dir = default_reports_dir()
     parser = argparse.ArgumentParser(description="Audit the Spanish obstetrics LM dataset artifacts.")
-    parser.add_argument("--raw-pages", type=Path, default=artifacts_dir / "raw_pages.jsonl")
-    parser.add_argument("--clean-pages", type=Path, default=artifacts_dir / "clean_pages.jsonl")
-    parser.add_argument("--chunks", type=Path, default=artifacts_dir / "chunks.jsonl")
+    parser.add_argument("--raw-pages", type=Path, default=corpus_dir / "raw_pages.jsonl")
+    parser.add_argument("--clean-pages", type=Path, default=corpus_dir / "clean_pages.jsonl")
+    parser.add_argument("--chunks", type=Path, default=corpus_dir / "chunks.jsonl")
     parser.add_argument("--train", type=Path, default=datasets_dir / "lm" / "train_lm.jsonl")
     parser.add_argument("--validation", type=Path, default=datasets_dir / "lm" / "validation_lm.jsonl")
     parser.add_argument("--test", type=Path, default=datasets_dir / "lm" / "test_lm.jsonl")
-    parser.add_argument("--inventory", type=Path, default=artifacts_dir / "inventory.json")
-    parser.add_argument("--table-report", "--tables-report", dest="table_report", type=Path, default=artifacts_dir / "table_extraction_report.json")
-    parser.add_argument("--output", type=Path, default=artifacts_dir / "audit_report.json")
+    parser.add_argument("--inventory", type=Path, default=metadata_dir / "inventory.json")
+    parser.add_argument("--table-report", "--tables-report", dest="table_report", type=Path, default=reports_dir / "table_extraction_report.json")
+    parser.add_argument("--output", type=Path, default=reports_dir / "audit_report.json")
     parser.add_argument("--samples-per-pdf", type=int, default=5)
     parser.add_argument("--sample-chars", type=int, default=700)
     parser.add_argument("--seed", type=int, default=42)
@@ -99,6 +109,14 @@ def topic_distribution(rows: List[Dict[str, Any]], chunk_index: Dict[str, Dict[s
         if isinstance(topics, list):
             for topic in topics:
                 counts[str(topic)] += 1
+    return counts
+
+
+def language_distribution(rows: List[Dict[str, Any]], chunk_index: Dict[str, Dict[str, Any]]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for row in rows:
+        metadata = merged_metadata(row, chunk_index)
+        counts[str(metadata.get("language", "unknown"))] += 1
     return counts
 
 
@@ -207,6 +225,9 @@ def main() -> None:
     train_topics = topic_distribution(train, chunk_index)
     validation_topics = topic_distribution(validation, chunk_index)
     test_topics = topic_distribution(test, chunk_index)
+    train_lang = language_distribution(train, chunk_index)
+    validation_lang = language_distribution(validation, chunk_index)
+    test_lang = language_distribution(test, chunk_index)
     train_topic_set = set(train_topics)
     validation_topic_set = set(validation_topics)
     test_topic_set = set(test_topics)
@@ -301,6 +322,12 @@ def main() -> None:
             "train_only_topics": sorted(train_topic_set - validation_topic_set),
             "validation_only_topics": sorted(validation_topic_set - train_topic_set),
             "test_only_topics": sorted(test_topic_set - train_topic_set - validation_topic_set),
+        },
+        "language_distribution": {
+            "train": dict(sorted(train_lang.items())),
+            "validation": dict(sorted(validation_lang.items())),
+            "test": dict(sorted(test_lang.items())),
+            "combined": dict(sorted((train_lang + validation_lang + test_lang).items())),
         },
         "average_chunk_tokens": round(
             sum(int(chunk.get("token_estimate", 0)) for chunk in chunks) / max(1, len(chunks)),

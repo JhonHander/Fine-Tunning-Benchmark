@@ -1,0 +1,384 @@
+{
+  "mode": "incremental",
+  "pdf_count": 63,
+  "pdfs": {
+    "pdfs/obstetrics/0120-5633-rcca-30-5-286.pdf": {
+      "source_pdf": "0120-5633-rcca-30-5-286.pdf",
+      "source_path": "pdfs/obstetrics/0120-5633-rcca-30-5-286.pdf",
+      "file_size": 1806228,
+      "mtime_ns": 1778961859974086706
+    },
+    "pdfs/obstetrics/02revision01.pdf": {
+      "source_pdf": "02revision01.pdf",
+      "source_path": "pdfs/obstetrics/02revision01.pdf",
+      "file_size": 610188,
+      "mtime_ns": 1778961859976086770
+    },
+    "pdfs/obstetrics/0300-9041-gom-85-06-380.pdf": {
+      "source_pdf": "0300-9041-gom-85-06-380.pdf",
+      "source_path": "pdfs/obstetrics/0300-9041-gom-85-06-380.pdf",
+      "file_size": 426841,
+      "mtime_ns": 1778961859977086803
+    },
+    "pdfs/obstetrics/0300-9041-gom-91-04-227.pdf": {
+      "source_pdf": "0300-9041-gom-91-04-227.pdf",
+      "source_path": "pdfs/obstetrics/0300-9041-gom-91-04-227.pdf",
+      "file_size": 387228,
+      "mtime_ns": 1778961859978086835
+    },
+    "pdfs/obstetrics/13043498.pdf": {
+      "source_pdf": "13043498.pdf",
+      "source_path": "pdfs/obstetrics/13043498.pdf",
+      "file_size": 67082,
+      "mtime_ns": 1778961859979086867
+    },
+    "pdfs/obstetrics/13076666.pdf": {
+      "source_pdf": "13076666.pdf",
+      "source_path": "pdfs/obstetrics/13076666.pdf",
+      "file_size": 65518,
+      "mtime_ns": 1778961859979086867
+    },
+    "pdfs/obstetrics/13091447.pdf": {
+      "source_pdf": "13091447.pdf",
+      "source_path": "pdfs/obstetrics/13091447.pdf",
+      "file_size": 73872,
+      "mtime_ns": 1778961859979086867
+    },
+    "pdfs/obstetrics/17_GAP_vulvovaginitis.pdf": {
+      "source_pdf": "17_GAP_vulvovaginitis.pdf",
+      "source_path": "pdfs/obstetrics/17_GAP_vulvovaginitis.pdf",
+      "file_size": 432955,
+      "mtime_ns": 1778961859981086932
+    },
+    "pdfs/obstetrics/18-vol-822.pdf": {
+      "source_pdf": "18-vol-822.pdf",
+      "source_path": "pdfs/obstetrics/18-vol-822.pdf",
+      "file_size": 3130785,
+      "mtime_ns": 1778961859991087254
+    },
+    "pdfs/obstetrics/2524-1710-prh-37-02-72.pdf": {
+      "source_pdf": "2524-1710-prh-37-02-72.pdf",
+      "source_path": "pdfs/obstetrics/2524-1710-prh-37-02-72.pdf",
+      "file_size": 184741,
+      "mtime_ns": 1778961859992087286
+    },
+    "pdfs/obstetrics/4142_stamped.pdf": {
+      "source_pdf": "4142_stamped.pdf",
+      "source_path": "pdfs/obstetrics/4142_stamped.pdf",
+      "file_size": 581178,
+      "mtime_ns": 1778961859994087351
+    },
+    "pdfs/obstetrics/4347_stamped.pdf": {
+      "source_pdf": "4347_stamped.pdf",
+      "source_path": "pdfs/obstetrics/4347_stamped.pdf",
+      "file_size": 620301,
+      "mtime_ns": 1778961859997087448
+    },
+    "pdfs/obstetrics/63fda96449432art4.pdf": {
+      "source_pdf": "63fda96449432art4.pdf",
+      "source_path": "pdfs/obstetrics/63fda96449432art4.pdf",
+      "file_size": 570697,
+      "mtime_ns": 1778961859998087480
+    },
+    "pdfs/obstetrics/CAP09.pdf": {
+      "source_pdf": "CAP09.pdf",
+      "source_path": "pdfs/obstetrics/CAP09.pdf",
+      "file_size": 277956,
+      "mtime_ns": 1778961859999087512
+    },
+    "pdfs/obstetrics/Capítulo+9.pdf": {
+      "source_pdf": "Capítulo+9.pdf",
+      "source_path": "pdfs/obstetrics/Capítulo+9.pdf",
+      "file_size": 487217,
+      "mtime_ns": 1778961860001087577
+    },
+    "pdfs/obstetrics/Diagnostico y tratamiento de las infecciones vulvovaginales.pdf": {
+      "source_pdf": "Diagnostico y tratamiento de las infecciones vulvovaginales.pdf",
+      "source_path": "pdfs/obstetrics/Diagnostico y tratamiento de las infecciones vulvovaginales.pdf",
+      "file_size": 785461,
+      "mtime_ns": 1778961860005087706
+    },
+    "pdfs/obstetrics/Diagnóstico y tratamiento de la infección vaginal obstétrica.pdf": {
+      "source_pdf": "Diagnóstico y tratamiento de la infección vaginal obstétrica.pdf",
+      "source_path": "pdfs/obstetrics/Diagnóstico y tratamiento de la infección vaginal obstétrica.pdf",
+      "file_size": 681340,
+      "mtime_ns": 1778961860008087803
+    },
+    "pdfs/obstetrics/Dialnet-AccidenteCerebroVascularEnPacientesEmbarazadasPron-9205904.pdf": {
+      "source_pdf": "Dialnet-AccidenteCerebroVascularEnPacientesEmbarazadasPron-9205904.pdf",
+      "source_path": "pdfs/obstetrics/Dialnet-AccidenteCerebroVascularEnPacientesEmbarazadasPron-9205904.pdf",
+      "file_size": 291699,
+      "mtime_ns": 1778961860009087836
+    },
+    "pdfs/obstetrics/GAP_Control prenatal del embarazo normal_6105.pdf": {
+      "source_pdf": "GAP_Control prenatal del embarazo normal_6105.pdf",
+      "source_path": "pdfs/obstetrics/GAP_Control prenatal del embarazo normal_6105.pdf",
+      "file_size": 453431,
+      "mtime_ns": 1778961860011087900
+    },
+    "pdfs/obstetrics/GINECOLOGÍA-Y-OBSTETRICIA.pdf": {
+      "source_pdf": "GINECOLOGÍA-Y-OBSTETRICIA.pdf",
+      "source_path": "pdfs/obstetrics/GINECOLOGÍA-Y-OBSTETRICIA.pdf",
+      "file_size": 11730247,
+      "mtime_ns": 1778961860036088709
+    },
+    "pdfs/obstetrics/GPC-Atencion-Prenatal-de-Bajo-Riesgo-2023.pdf": {
+      "source_pdf": "GPC-Atencion-Prenatal-de-Bajo-Riesgo-2023.pdf",
+      "source_path": "pdfs/obstetrics/GPC-Atencion-Prenatal-de-Bajo-Riesgo-2023.pdf",
+      "file_size": 3440098,
+      "mtime_ns": 1778961860051089195
+    },
+    "pdfs/obstetrics/GPC-CPN-final-mayo-2016-DNN.pdf": {
+      "source_pdf": "GPC-CPN-final-mayo-2016-DNN.pdf",
+      "source_path": "pdfs/obstetrics/GPC-CPN-final-mayo-2016-DNN.pdf",
+      "file_size": 1881214,
+      "mtime_ns": 1778961860059089454
+    },
+    "pdfs/obstetrics/GPC_472_Parto_Normal_Osteba_compl.pdf": {
+      "source_pdf": "GPC_472_Parto_Normal_Osteba_compl.pdf",
+      "source_path": "pdfs/obstetrics/GPC_472_Parto_Normal_Osteba_compl.pdf",
+      "file_size": 3214656,
+      "mtime_ns": 1778961860076090004
+    },
+    "pdfs/obstetrics/GPC_533_Embarazo_AETSA_compl.pdf": {
+      "source_pdf": "GPC_533_Embarazo_AETSA_compl.pdf",
+      "source_path": "pdfs/obstetrics/GPC_533_Embarazo_AETSA_compl.pdf",
+      "file_size": 2978827,
+      "mtime_ns": 1778961860089090424
+    },
+    "pdfs/obstetrics/GUIA 1.  CONTROL PRENATAL Y FACTORES DE RIESGO.pdf": {
+      "source_pdf": "GUIA 1.  CONTROL PRENATAL Y FACTORES DE RIESGO.pdf",
+      "source_path": "pdfs/obstetrics/GUIA 1.  CONTROL PRENATAL Y FACTORES DE RIESGO.pdf",
+      "file_size": 101795,
+      "mtime_ns": 1778961860089090424
+    },
+    "pdfs/obstetrics/Guia_Practica_Clinica_para_la_Prevencion_y_manejo_de_la_Preeclampsia_y_Eclampsia.pdf": {
+      "source_pdf": "Guia_Practica_Clinica_para_la_Prevencion_y_manejo_de_la_Preeclampsia_y_Eclampsia.pdf",
+      "source_path": "pdfs/obstetrics/Guia_Practica_Clinica_para_la_Prevencion_y_manejo_de_la_Preeclampsia_y_Eclampsia.pdf",
+      "file_size": 1303047,
+      "mtime_ns": 1778961860093090554
+    },
+    "pdfs/obstetrics/Guía.completa.Embarazo.Parto.2013.pdf": {
+      "source_pdf": "Guía.completa.Embarazo.Parto.2013.pdf",
+      "source_path": "pdfs/obstetrics/Guía.completa.Embarazo.Parto.2013.pdf",
+      "file_size": 3715996,
+      "mtime_ns": 1778961860110091104
+    },
+    "pdfs/obstetrics/INFAC_Vol_33_6_embarazo.pdf": {
+      "source_pdf": "INFAC_Vol_33_6_embarazo.pdf",
+      "source_path": "pdfs/obstetrics/INFAC_Vol_33_6_embarazo.pdf",
+      "file_size": 563155,
+      "mtime_ns": 1778961860113091201
+    },
+    "pdfs/obstetrics/MAN_PROC_SERV_GIN_2023.pdf": {
+      "source_pdf": "MAN_PROC_SERV_GIN_2023.pdf",
+      "source_path": "pdfs/obstetrics/MAN_PROC_SERV_GIN_2023.pdf",
+      "file_size": 23890185,
+      "mtime_ns": 1778961860234095116
+    },
+    "pdfs/obstetrics/Manual-Obstetricia-y-Ginecologia-2024_compressed.pdf": {
+      "source_pdf": "Manual-Obstetricia-y-Ginecologia-2024_compressed.pdf",
+      "source_path": "pdfs/obstetrics/Manual-Obstetricia-y-Ginecologia-2024_compressed.pdf",
+      "file_size": 19152930,
+      "mtime_ns": 1778961860310097575
+    },
+    "pdfs/obstetrics/Manual_obstetricia_ginecologia.pdf": {
+      "source_pdf": "Manual_obstetricia_ginecologia.pdf",
+      "source_path": "pdfs/obstetrics/Manual_obstetricia_ginecologia.pdf",
+      "file_size": 11283024,
+      "mtime_ns": 1778961860346098740
+    },
+    "pdfs/obstetrics/Medicamentos_y_embarazo.pdf": {
+      "source_pdf": "Medicamentos_y_embarazo.pdf",
+      "source_path": "pdfs/obstetrics/Medicamentos_y_embarazo.pdf",
+      "file_size": 1959489,
+      "mtime_ns": 1778961860354098999
+    },
+    "pdfs/obstetrics/Protocolo Atencion Obstetrica.pdf": {
+      "source_pdf": "Protocolo Atencion Obstetrica.pdf",
+      "source_path": "pdfs/obstetrics/Protocolo Atencion Obstetrica.pdf",
+      "file_size": 2057451,
+      "mtime_ns": 1778961860361099225
+    },
+    "pdfs/obstetrics/Protocolo-de-Atencion-Clinica-integral-al-embarazo-parto-y-postparto-2.pdf": {
+      "source_pdf": "Protocolo-de-Atencion-Clinica-integral-al-embarazo-parto-y-postparto-2.pdf",
+      "source_path": "pdfs/obstetrics/Protocolo-de-Atencion-Clinica-integral-al-embarazo-parto-y-postparto-2.pdf",
+      "file_size": 2279457,
+      "mtime_ns": 1778961860372099581
+    },
+    "pdfs/obstetrics/RD_N°290_APROBAR_LA_GUIA_DE_PRACTICA_CLINICA_VERSION_EXTENSA.pdf": {
+      "source_pdf": "RD_N°290_APROBAR_LA_GUIA_DE_PRACTICA_CLINICA_VERSION_EXTENSA.pdf",
+      "source_path": "pdfs/obstetrics/RD_N°290_APROBAR_LA_GUIA_DE_PRACTICA_CLINICA_VERSION_EXTENSA.pdf",
+      "file_size": 3425250,
+      "mtime_ns": 1778961860394100293
+    },
+    "pdfs/obstetrics/RECOM_obstetricia_web.pdf": {
+      "source_pdf": "RECOM_obstetricia_web.pdf",
+      "source_path": "pdfs/obstetrics/RECOM_obstetricia_web.pdf",
+      "file_size": 3999765,
+      "mtime_ns": 1778961860402100552
+    },
+    "pdfs/obstetrics/RENC-D-22-0037_Manuscrito_final.pdf": {
+      "source_pdf": "RENC-D-22-0037_Manuscrito_final.pdf",
+      "source_path": "pdfs/obstetrics/RENC-D-22-0037_Manuscrito_final.pdf",
+      "file_size": 634367,
+      "mtime_ns": 1778961860406100681
+    },
+    "pdfs/obstetrics/S0001731011000780.pdf": {
+      "source_pdf": "S0001731011000780.pdf",
+      "source_path": "pdfs/obstetrics/S0001731011000780.pdf",
+      "file_size": 127398,
+      "mtime_ns": 1778961860407100714
+    },
+    "pdfs/obstetrics/S0213005X09004418.pdf": {
+      "source_pdf": "S0213005X09004418.pdf",
+      "source_path": "pdfs/obstetrics/S0213005X09004418.pdf",
+      "file_size": 160586,
+      "mtime_ns": 1778961860408100746
+    },
+    "pdfs/obstetrics/S0304501310004589.pdf": {
+      "source_pdf": "S0304501310004589.pdf",
+      "source_path": "pdfs/obstetrics/S0304501310004589.pdf",
+      "file_size": 332082,
+      "mtime_ns": 1778961860411100843
+    },
+    "pdfs/obstetrics/S0716864011704321.pdf": {
+      "source_pdf": "S0716864011704321.pdf",
+      "source_path": "pdfs/obstetrics/S0716864011704321.pdf",
+      "file_size": 147479,
+      "mtime_ns": 1778961860412100876
+    },
+    "pdfs/obstetrics/S0716864014706406.pdf": {
+      "source_pdf": "S0716864014706406.pdf",
+      "source_path": "pdfs/obstetrics/S0716864014706406.pdf",
+      "file_size": 511199,
+      "mtime_ns": 1778961860415100973
+    },
+    "pdfs/obstetrics/S0716864015000917.pdf": {
+      "source_pdf": "S0716864015000917.pdf",
+      "source_path": "pdfs/obstetrics/S0716864015000917.pdf",
+      "file_size": 455247,
+      "mtime_ns": 1778961860417101037
+    },
+    "pdfs/obstetrics/S071686402300007X.pdf": {
+      "source_pdf": "S071686402300007X.pdf",
+      "source_path": "pdfs/obstetrics/S071686402300007X.pdf",
+      "file_size": 160353,
+      "mtime_ns": 1778961860419101102
+    },
+    "pdfs/obstetrics/S0716864024000324.pdf": {
+      "source_pdf": "S0716864024000324.pdf",
+      "source_path": "pdfs/obstetrics/S0716864024000324.pdf",
+      "file_size": 139626,
+      "mtime_ns": 1778961860420101134
+    },
+    "pdfs/obstetrics/S071686402500046X.pdf": {
+      "source_pdf": "S071686402500046X.pdf",
+      "source_path": "pdfs/obstetrics/S071686402500046X.pdf",
+      "file_size": 127459,
+      "mtime_ns": 1778961860420101134
+    },
+    "pdfs/obstetrics/TFG-H2297.pdf": {
+      "source_pdf": "TFG-H2297.pdf",
+      "source_path": "pdfs/obstetrics/TFG-H2297.pdf",
+      "file_size": 750420,
+      "mtime_ns": 1778961860424101264
+    },
+    "pdfs/obstetrics/a09v60n2.pdf": {
+      "source_pdf": "a09v60n2.pdf",
+      "source_path": "pdfs/obstetrics/a09v60n2.pdf",
+      "file_size": 195471,
+      "mtime_ns": 1778961860425101296
+    },
+    "pdfs/obstetrics/a11v18n2.pdf": {
+      "source_pdf": "a11v18n2.pdf",
+      "source_path": "pdfs/obstetrics/a11v18n2.pdf",
+      "file_size": 219166,
+      "mtime_ns": 1778961860426101329
+    },
+    "pdfs/obstetrics/admobstygine,+Memorias+ObsyGine+2017+08+páginas+-41-45.pdf": {
+      "source_pdf": "admobstygine,+Memorias+ObsyGine+2017+08+páginas+-41-45.pdf",
+      "source_path": "pdfs/obstetrics/admobstygine,+Memorias+ObsyGine+2017+08+páginas+-41-45.pdf",
+      "file_size": 1010506,
+      "mtime_ns": 1778961860428101393
+    },
+    "pdfs/obstetrics/art04.pdf": {
+      "source_pdf": "art04.pdf",
+      "source_path": "pdfs/obstetrics/art04.pdf",
+      "file_size": 235570,
+      "mtime_ns": 1778961860430101458
+    },
+    "pdfs/obstetrics/art06.pdf": {
+      "source_pdf": "art06.pdf",
+      "source_path": "pdfs/obstetrics/art06.pdf",
+      "file_size": 326386,
+      "mtime_ns": 1778961860432101523
+    },
+    "pdfs/obstetrics/art09.pdf": {
+      "source_pdf": "art09.pdf",
+      "source_path": "pdfs/obstetrics/art09.pdf",
+      "file_size": 160811,
+      "mtime_ns": 1778961860433101555
+    },
+    "pdfs/obstetrics/art11.pdf": {
+      "source_pdf": "art11.pdf",
+      "source_path": "pdfs/obstetrics/art11.pdf",
+      "file_size": 221991,
+      "mtime_ns": 1778961860435101620
+    },
+    "pdfs/obstetrics/gpcsepsisvaginal.pdf": {
+      "source_pdf": "gpcsepsisvaginal.pdf",
+      "source_path": "pdfs/obstetrics/gpcsepsisvaginal.pdf",
+      "file_size": 62382,
+      "mtime_ns": 1778961860435101620
+    },
+    "pdfs/obstetrics/guiaPracClinPartoCompleta.pdf": {
+      "source_pdf": "guiaPracClinPartoCompleta.pdf",
+      "source_path": "pdfs/obstetrics/guiaPracClinPartoCompleta.pdf",
+      "file_size": 3622632,
+      "mtime_ns": 1778961860452102170
+    },
+    "pdfs/obstetrics/rechog_25_90_4_237-246.pdf": {
+      "source_pdf": "rechog_25_90_4_237-246.pdf",
+      "source_path": "pdfs/obstetrics/rechog_25_90_4_237-246.pdf",
+      "file_size": 971998,
+      "mtime_ns": 1778961860456102299
+    },
+    "pdfs/obstetrics/rechog_25_90_4_265-273.pdf": {
+      "source_pdf": "rechog_25_90_4_265-273.pdf",
+      "source_path": "pdfs/obstetrics/rechog_25_90_4_265-273.pdf",
+      "file_size": 666969,
+      "mtime_ns": 1778961860459102396
+    },
+    "pdfs/obstetrics/revision1.pdf": {
+      "source_pdf": "revision1.pdf",
+      "source_path": "pdfs/obstetrics/revision1.pdf",
+      "file_size": 2868918,
+      "mtime_ns": 1778961860471102785
+    },
+    "pdfs/obstetrics/usingunindicatorsqa-sp.pdf": {
+      "source_pdf": "usingunindicatorsqa-sp.pdf",
+      "source_path": "pdfs/obstetrics/usingunindicatorsqa-sp.pdf",
+      "file_size": 204521,
+      "mtime_ns": 1778961860472102817
+    },
+    "pdfs/obstetrics/v28n1a5.pdf": {
+      "source_pdf": "v28n1a5.pdf",
+      "source_path": "pdfs/obstetrics/v28n1a5.pdf",
+      "file_size": 272337,
+      "mtime_ns": 1778961860474102882
+    },
+    "pdfs/obstetrics/vol-842-1.pdf": {
+      "source_pdf": "vol-842-1.pdf",
+      "source_path": "pdfs/obstetrics/vol-842-1.pdf",
+      "file_size": 2970659,
+      "mtime_ns": 1778961860486103270
+    },
+    "pdfs/obstetrics/vol831-1.pdf": {
+      "source_pdf": "vol831-1.pdf",
+      "source_path": "pdfs/obstetrics/vol831-1.pdf",
+      "file_size": 1803454,
+      "mtime_ns": 1778961860493103496
+    }
+  }
+}

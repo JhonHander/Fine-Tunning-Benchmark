@@ -6,7 +6,16 @@ import sys
 from pathlib import Path
 from typing import List
 
-from utils import default_artifacts_dir, default_datasets_dir, default_pdfs_dir, project_root
+from utils import (
+    default_artifacts_dir,
+    default_corpus_dir,
+    default_datasets_dir,
+    default_metadata_dir,
+    default_pdfs_dir,
+    default_reports_dir,
+    default_tables_dir,
+    project_root,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,21 +72,29 @@ def run_step(label: str, command: List[str]) -> None:
 def main() -> None:
     args = parse_args()
     artifacts_dir = args.artifacts_dir
+    corpus_dir = default_corpus_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "corpus"
+    metadata_dir = default_metadata_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "metadata"
+    reports_dir = default_reports_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "reports"
+    tables_dir = default_tables_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "tables"
     datasets_dir = args.datasets_dir
     lm_dir = datasets_dir / "lm"
     qa_dir = datasets_dir / "qa"
-    raw_pages = artifacts_dir / "raw_pages.jsonl"
-    inventory = artifacts_dir / "inventory.json"
-    clean_pages = artifacts_dir / "clean_pages.jsonl"
-    cleaning_report = artifacts_dir / "cleaning_report.json"
-    tables = artifacts_dir / "tables.jsonl"
-    table_report = artifacts_dir / "table_extraction_report.json"
-    chunks = artifacts_dir / "chunks.jsonl"
+    corpus_dir.mkdir(parents=True, exist_ok=True)
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    raw_pages = corpus_dir / "raw_pages.jsonl"
+    inventory = metadata_dir / "inventory.json"
+    clean_pages = corpus_dir / "clean_pages.jsonl"
+    cleaning_report = reports_dir / "cleaning_report.json"
+    tables = tables_dir / "tables.jsonl"
+    table_report = reports_dir / "table_extraction_report.json"
+    chunks = corpus_dir / "chunks.jsonl"
     train = lm_dir / "train_lm.jsonl"
     validation = lm_dir / "validation_lm.jsonl"
     test = lm_dir / "test_lm.jsonl"
-    build_report = artifacts_dir / "build_report.json"
-    audit_report = artifacts_dir / "audit_report.json"
+    build_report = reports_dir / "build_report.json"
+    audit_report = reports_dir / "audit_report.json"
 
     run_step(
         "Extract PDFs",

@@ -1,16 +1,16 @@
 """
 extract_tables.py
 =================
-Extrae tablas estructuradas de PDFs de obstetricia usando pdfplumber.
+Extract structured tables from obstetrics PDFs using pdfplumber.
 
-Las tablas son especialmente importantes en GPCs donde contienen:
-- Tablas de evidencia (nivel de evidencia, grado de recomendación)
-- Tablas de algoritmos de manejo
-- Tablas de dosificación
-- Tablas de criterios diagnósticos
+Tables are especially relevant in CPGs because they often contain:
+- Evidence tables (evidence level, recommendation grade)
+- Clinical management algorithm tables
+- Dosing tables
+- Diagnostic criteria tables
 
-Uso:
-    python scripts/extract_tables.py --input-dir pdfs/obstetrics --output artifacts/obstetrics/tables.jsonl
+Usage:
+    python scripts/extract_tables.py --input-dir pdfs/obstetrics --output artifacts/obstetrics/tables/tables.jsonl
 """
 from __future__ import annotations
 
@@ -22,11 +22,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from tqdm import tqdm
 
-from utils import default_artifacts_dir, default_pdfs_dir, project_root, slugify, write_jsonl
+from utils import default_reports_dir, default_tables_dir, default_pdfs_dir, project_root, slugify, write_jsonl
 
 
-# Configuración optimizada para tablas médicas (GPCs, protocolos)
-# Muchas tablas médicas usan líneas explícitas o alineación de texto
+# Optimized settings for medical tables (CPGs, protocols).
+# Many medical tables rely on explicit lines or text alignment.
 TABLE_SETTINGS_MEDICAL = {
     "vertical_strategy": "lines",
     "horizontal_strategy": "lines",
@@ -40,7 +40,7 @@ TABLE_SETTINGS_MEDICAL = {
     "text_y_tolerance": 5,
 }
 
-# Para tablas sin líneas visibles (alineación por texto)
+# Settings for tables without visible lines (text-aligned tables).
 TABLE_SETTINGS_TEXT = {
     "vertical_strategy": "text",
     "horizontal_strategy": "text",
@@ -59,13 +59,14 @@ SHORT_TOKEN_RE = re.compile(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{1,3}$")
 
 
 def parse_args() -> argparse.Namespace:
-    artifacts_dir = default_artifacts_dir()
+    tables_dir = default_tables_dir()
+    reports_dir = default_reports_dir()
     parser = argparse.ArgumentParser(
         description="Extract structured tables from Spanish obstetrics PDFs."
     )
     parser.add_argument("--input-dir", type=Path, default=default_pdfs_dir())
-    parser.add_argument("--output", type=Path, default=artifacts_dir / "tables.jsonl")
-    parser.add_argument("--report-output", type=Path, default=artifacts_dir / "table_extraction_report.json")
+    parser.add_argument("--output", type=Path, default=tables_dir / "tables.jsonl")
+    parser.add_argument("--report-output", type=Path, default=reports_dir / "table_extraction_report.json")
     parser.add_argument("--recursive", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument(
         "--pdf",
@@ -110,10 +111,10 @@ def extract_tables_from_page(
     min_cols: int,
     strict_mode: bool,
 ) -> List[Dict[str, Any]]:
-    """Extrae tablas de una página usando pdfplumber.
+    """Extract tables from a page using pdfplumber.
 
     Returns:
-        Lista de tablas con metadata.
+        Extracted table records with page, strategy, and quality metadata.
     """
     tables_found: List[Dict[str, Any]] = []
 
@@ -185,7 +186,7 @@ def extract_tables_from_page(
 
     for strat_name, settings in strategies:
         try:
-            # Usar find_tables para obtener metadata + datos
+            # Use find_tables to access table metadata and cell data.
             table_objects = page.find_tables(table_settings=settings)
 
             for tbl_idx, table in enumerate(table_objects):
@@ -196,7 +197,7 @@ def extract_tables_from_page(
 
                     data_norm = normalize_data(data)
 
-                    # Verificar que tenga suficientes columnas
+                    # Ensure the candidate has enough columns.
                     first_row_cols = len(data_norm[0]) if data_norm else 0
                     if first_row_cols < min_cols:
                         continue
@@ -205,7 +206,7 @@ def extract_tables_from_page(
                     first_row = data_norm[0] if data_norm else []
                     looks_like_header = header_like(first_row)
 
-                    # Reglas estrictas para evitar falsos positivos de layout.
+                    # Strict heuristics to avoid layout-driven false positives.
                     if strict_mode and seems_layout_fragment(len(data_norm), first_row_cols, metrics):
                         continue
 
@@ -220,11 +221,10 @@ def extract_tables_from_page(
                         if strict_mode and metrics["numeric_ratio"] < 0.18:
                             continue
 
-                    # Detectar si la primera fila es header
+                    # Treat the first row as the header candidate.
                     headers = first_row
                     rows = data_norm[1:] if len(data_norm) > 1 else []
-
-                    # Verificar que no sea una tabla vacía o de solo espacios
+                    # Skip empty or whitespace-only table candidates.
                     non_empty_cells = sum(1 for row in data_norm for cell in row if cell and str(cell).strip())
                     if non_empty_cells < min_rows * min_cols:
                         continue
@@ -240,18 +240,18 @@ def extract_tables_from_page(
                         "col_count": first_row_cols,
                         "headers": headers,
                         "rows": rows,
-                        "raw_data": data_norm,  # Backup completo
+                        "raw_data": data_norm,  # Full backup of normalized cell data.
                         "quality_metrics": metrics,
                         "is_header_like": looks_like_header,
                     }
                     tables_found.append(table_record)
 
                 except Exception as e:
-                    # Tabla individual falló, continuar con la siguiente
+                    # Keep processing if a single table extraction fails.
                     continue
 
         except Exception as e:
-            # Estrategia falló, continuar con la siguiente
+            # Keep processing if one strategy fails.
             continue
 
     return tables_found
@@ -264,10 +264,10 @@ def extract_pdf_tables(
     min_cols: int,
     strict_mode: bool,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Extrae todas las tablas de un PDF.
+    """Extract all tables from a PDF.
 
     Returns:
-        (lista_de_tablas, reporte_del_pdf)
+        Tuple of (table_records, per_pdf_report).
     """
     import pdfplumber
 
@@ -377,10 +377,9 @@ def main() -> None:
         all_tables.extend(tables)
         pdf_reports.append(report)
 
-    # Guardar tablas
+    # Persist extracted tables.
     count = write_jsonl(args.output, all_tables)
-
-    # Generar reporte
+    # Build summary report.
     total_pdfs = len(pdfs)
     pdfs_with_tables = sum(1 for r in pdf_reports if r.get("total_tables", 0) > 0)
     total_tables = sum(r.get("total_tables", 0) for r in pdf_reports)

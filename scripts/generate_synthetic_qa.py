@@ -1,40 +1,39 @@
 """
 generate_synthetic_qa.py
 ========================
-Genera pares sintéticos de Pregunta/Respuesta en español a partir de los
-chunks ya procesados en datasets/obstetrics/lm/train_lm.jsonl.
+Generate synthetic Spanish Question/Answer pairs from chunks already
+processed in `datasets/obstetrics/lm/train_lm.jsonl`.
 
-Usa OpenAI Structured Outputs (gpt-4o-mini / gpt-4o) para garantizar que
-la salida sea un JSON válido y alineado con el esquema Pydantic. Todos los
-registros se escriben en formato messages (SFT-ready) para Unsloth o
-HuggingFace TRL.
+Uses OpenAI Structured Outputs (gpt-4o-mini / gpt-4o) to guarantee valid
+JSON aligned with the Pydantic schema. All records are written in
+`messages` format (SFT-ready) for Unsloth or HuggingFace TRL.
 
-Flujo:
-  1. Lee los chunks de train_lm.jsonl (producidos por build_obstetrics_lm_dataset.py)
-  2. Determina cuántos pares generar por chunk según token_estimate y clinical_score
-  3. Llama a la API de forma asíncrona (semáforo configurable)
-  4. Guarda checkpoint incremental para poder reanudar si algo falla
-  5. Escribe dos archivos:
-       - synthetic_qa_raw.jsonl  → pares crudos con metadatos para auditoría
-       - synthetic_qa_sft.jsonl  → formato {"messages": [...], "metadata": {...}}
-                                   listo para entrenamiento SFT/QLoRA
+Flow:
+  1. Read chunks from `train_lm.jsonl` (produced by `build_obstetrics_lm_dataset.py`).
+  2. Determine how many pairs to generate per chunk from `token_estimate` and `clinical_score`.
+  3. Call the API asynchronously (configurable semaphore).
+  4. Save incremental checkpoints to support safe resume.
+  5. Write two files:
+       - `synthetic_qa_raw.jsonl` -> raw pairs with audit metadata
+       - `synthetic_qa_sft.jsonl` -> {"messages": [...], "metadata": {...}}
+                                     ready for SFT/QLoRA training.
 
-Uso básico:
+Basic usage:
     export OPENAI_API_KEY="sk-..."
     python scripts/generate_synthetic_qa.py
 
-Dry-run (sin llamar a la API):
+Dry-run (without API calls):
     python scripts/generate_synthetic_qa.py --dry-run
 
-Estimación de costo (856 chunks, mayo 2026):
-    gpt-5.4-mini  ≈ $1.10  USD  (recomendado para presupuesto)
-    gpt-5.4       ≈ $4.50  USD  (balance calidad/costo)
-    gpt-5.5       ≈ $8.00  USD  (máxima calidad clínica)
+Cost estimate (856 chunks, May 2026):
+    gpt-5.4-mini  ≈ $1.10 USD (budget recommendation)
+    gpt-5.4       ≈ $4.50 USD (quality/cost balance)
+    gpt-5.5       ≈ $8.00 USD (maximum clinical quality)
 
-Nota: gpt-4o y gpt-4o-mini fueron deprecados en febrero 2026.
+Note: gpt-4o and gpt-4o-mini were deprecated in February 2026.
 
-Versiones mínimas requeridas:
-    openai>=1.68.0   (structured outputs estables, sin .beta.)
+Minimum required versions:
+    openai>=1.68.0   (stable structured outputs, without .beta.)
     pydantic>=2.7.0
 """
 
@@ -50,6 +49,7 @@ import re
 import sys
 import time
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple
 
@@ -57,7 +57,7 @@ from pydantic import BaseModel, field_validator
 from tqdm.asyncio import tqdm as atqdm
 
 # ---------------------------------------------------------------------------
-# Pydantic: esquema de respuesta (Structured Outputs de OpenAI)
+# Structured-output schemas returned by the OpenAI generation and judge calls.
 # ---------------------------------------------------------------------------
 
 TipoPregunta = Literal[
@@ -91,21 +91,37 @@ class RespuestaGeneracion(BaseModel):
     pares: List[QAPar]
 
 
+class PairQuality(BaseModel):
+    faithfulness: float
+    answer_relevancy: float
+    roundtrip_consistency: float
+    verdict: Literal["accept", "reject"]
+    reason: str
+
+    @field_validator("faithfulness", "answer_relevancy", "roundtrip_consistency", mode="before")
+    @classmethod
+    def clamp_score(cls, v: Any) -> float:
+        x = float(v)
+        return max(0.0, min(1.0, x))
+
+
 # ---------------------------------------------------------------------------
 # Prompts
 # ---------------------------------------------------------------------------
 
-# Prompt del sistema usado DENTRO del mensaje SFT (lo que verá el modelo al inferir).
+# This is the system prompt stored inside each SFT example, so it defines the
+# behavior the fine-tuned model will learn at inference time. Keep it narrower
+# than generation-time policy: it should describe the target assistant, not the
+# data-construction process.
 SFT_SYSTEM_PROMPT = (
-    "Eres un asistente médico especializado en obstetricia y ginecología. "
-    "Responde en español con precisión clínica, usando vocabulario médico apropiado. "
-    "Tus respuestas deben ser claras, basadas en evidencia y coherentes con las guías "
-    "y protocolos clínicos vigentes en Latinoamérica. Cuando la pregunta implique una "
-    "situación de urgencia obstétrica, indica explícitamente que requiere atención "
-    "médica inmediata."
+    "Eres un asistente especializado en obstetricia y ginecología. "
+    "Responde en español con precisión clínica, claridad y vocabulario médico apropiado. "
+    "Prioriza respuestas fieles a la evidencia disponible, bien estructuradas y útiles "
+    "para resolver la pregunta planteada. Si la evidencia disponible no permite una "
+    "afirmación concluyente, indícalo con claridad en lugar de inventar detalles."
 )
 
-# Prompt del sistema que le damos a GPT para que GENERE los pares.
+# Generation-time prompt used to create candidate QA pairs from each source chunk.
 GENERATION_SYSTEM_PROMPT = """\
 Eres un experto en generación de datasets de entrenamiento para modelos de lenguaje.
 Tu tarea es leer fragmentos de una base de conocimiento médica en obstetricia y ginecología,
@@ -113,10 +129,12 @@ y generar pares de pregunta-respuesta de alta calidad en español para fine-tuni
 supervisado (SFT).
 
 Reglas estrictas:
+0. Usa un enfoque "evidence-first": primero identifica evidencia en el contexto y después construye la pregunta y respuesta.
 1. Las preguntas deben ser DIVERSAS en tipo: factuales, de razonamiento, de definición,
    de comparación, de aplicación práctica y de "qué pasa si" (hipotético).
-2. Las respuestas deben ser completas, precisas y basadas ÚNICAMENTE en el texto dado.
-   No inventes información que no esté en el contexto.
+2. Las respuestas deben ser completas y precisas, priorizando SIEMPRE el contexto dado como fuente principal.
+   Puedes usar conocimiento médico general solo para redactar con claridad y coherencia clínica.
+   Si el contexto es insuficiente o ambiguo para una afirmación, indícalo explícitamente y no fabriques detalles.
 3. Usa español natural y vocabulario médico correcto; no traduzcas literalmente del inglés.
 4. Varía la longitud de las respuestas: algunas cortas (1-2 oraciones) y otras desarrolladas
    (varios párrafos si el tema lo amerita).
@@ -125,9 +143,20 @@ Reglas estrictas:
 6. Distribuye los tipos a lo largo de los pares: no repitas el mismo tipo consecutivamente
    si tienes más de 2 pares.
 7. Para preguntas de tipo "aplicacion" usa viñetas clínicas cortas (paciente con X condición).
+8. Las preguntas deben quedar limpias y autocontenidas: NO escribas frases como
+   "según el texto", "según el fragmento", "de acuerdo con el fragmento",
+   "con base en el texto", "según la tabla" ni expresiones equivalentes.
+9. Cada pregunta debe contener UNA sola demanda central. Evita preguntas dobles
+   unidas por "y", "además", "cuál es... y por qué...", etc. Si dos ideas merecen
+   preguntarse, conviértelas en dos pares separados solo cuando cada una sea útil por sí misma.
+10. No sacrifiques calidad por cantidad. Genera solo pares que el fragmento soporte bien;
+    evita forzar tipos o preguntas adicionales si el contenido no lo permite.
+11. Las respuestas también deben quedar limpias y autocontenidas: NO escribas
+    "el fragmento dice", "el contexto señala", "según el texto" ni expresiones equivalentes.
+    Responde directamente como si la pregunta fuera autónoma.
 """
 
-# Template del mensaje de usuario enviado a GPT por cada chunk.
+# Per-chunk user message template sent to the generation model.
 GENERATION_USER_TEMPLATE = """\
 Documento fuente: {source_pdf}
 Sección: {section}
@@ -136,8 +165,48 @@ Sección: {section}
 {text}
 </contexto>
 
-Genera exactamente {n_pairs} pares de pregunta-respuesta en español basados en el \
-fragmento anterior.
+Genera hasta {n_pairs} pares de pregunta-respuesta en español basados en el \
+fragmento anterior. No intentes acercarte a ese número si el contenido no lo justifica:
+si el fragmento solo permite 1 o 2 pares de alta calidad, genera solo esos.
+"""
+
+ROUNDTRIP_SYSTEM_PROMPT = """\
+Eres un asistente clínico. Responde SOLO con base en el contexto provisto.
+Puedes usar conocimiento médico general únicamente para mejorar redacción y claridad.
+Si algo no está suficientemente respaldado por el contexto, responde: "No hay evidencia suficiente en el contexto."
+Prioriza siempre el contexto sobre memoria general.
+"""
+
+ROUNDTRIP_USER_TEMPLATE = """\
+<contexto>
+{text}
+</contexto>
+
+Pregunta:
+{question}
+"""
+
+QUALITY_JUDGE_SYSTEM_PROMPT = """\
+Eres un evaluador estricto de calidad para datasets QA médicos.
+Evalúa:
+1) faithfulness: qué tan respaldada está la respuesta por el contexto.
+2) answer_relevancy: qué tan bien responde la pregunta.
+3) roundtrip_consistency: qué tan consistente es con una segunda respuesta independiente.
+Retorna puntajes [0,1], verdict (accept/reject) y reason breve.
+"""
+
+QUALITY_JUDGE_USER_TEMPLATE = """\
+Contexto:
+{context}
+
+Pregunta:
+{question}
+
+Respuesta original:
+{answer}
+
+Respuesta roundtrip:
+{roundtrip_answer}
 """
 
 # ---------------------------------------------------------------------------
@@ -147,27 +216,29 @@ fragmento anterior.
 MAX_RETRIES = 5
 BASE_BACKOFF_S = 2.0
 
-# Modelos activos en la API de OpenAI a mayo 2026.
-# gpt-4o y gpt-4o-mini fueron deprecados en febrero 2026.
+# Active OpenAI API models as of May 2026.
+# gpt-4o and gpt-4o-mini were deprecated in February 2026.
 SUPPORTED_MODELS = (
-    "gpt-5.4-mini",  # Más barato y rápido, reemplaza a gpt-4o-mini
-    "gpt-5.4",  # Balance calidad/costo
-    "gpt-5.5",  # Flagship, mejor calidad, más caro
+    "gpt-5.2",
+    "gpt-5.4-mini",  # Lower-cost, faster replacement for gpt-4o-mini.
+    "gpt-5.4",  # Balanced quality/cost option.
+    "gpt-5.5",  # Highest-quality option, with higher cost.
 )
 
-# Precios por millón de tokens (mayo 2026, fuente: platform.openai.com/api/docs/models)
+# Prices per million tokens (May 2026, source: platform.openai.com/api/docs/models).
 PRICES_PER_M = {
+    "gpt-5.2": {"input": 2.50, "output": 15.00},
     "gpt-5.4-mini": {"input": 0.75, "output": 4.50},
     "gpt-5.4": {"input": 2.50, "output": 15.00},
     "gpt-5.5": {"input": 5.00, "output": 30.00},
 }
 
-# Estimación conservadora de tokens de respuesta por par generado
+# Conservative output-token estimate per generated QA pair.
 TOKENS_PER_PAIR_OUTPUT_EST = 160
 
 
 # ---------------------------------------------------------------------------
-# Helpers de I/O
+# File I/O helpers.
 # ---------------------------------------------------------------------------
 
 
@@ -190,7 +261,7 @@ def read_jsonl(path: Path) -> List[Dict[str, Any]]:
 
 
 def append_jsonl(path: Path, rows: List[Dict[str, Any]]) -> None:
-    """Escribe los registros en modo append para no perder datos si el script se interrumpe."""
+    """Append records so an interrupted run does not overwrite completed work."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as fh:
         for row in rows:
@@ -209,6 +280,26 @@ def load_progress(path: Path) -> Set[str]:
     return set(data.get("processed_chunk_ids", []))
 
 
+def load_processed_ids_from_raw_output(path: Path) -> Set[str]:
+    """Recover chunk IDs already written to raw output to avoid duplicates on resume."""
+    if not path.exists():
+        return set()
+    processed: Set[str] = set()
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            chunk_id = str(row.get("chunk_id", "")).strip()
+            if chunk_id:
+                processed.add(chunk_id)
+    return processed
+
+
 def save_progress(path: Path, processed_ids: Set[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -221,8 +312,21 @@ def save_progress(path: Path, processed_ids: Set[str]) -> None:
     )
 
 
+def status_path_for_progress(progress_file: Path) -> Path:
+    return progress_file.with_name(f"{progress_file.stem}_status.json")
+
+
+def save_run_status(path: Path, payload: Dict[str, Any]) -> None:
+    """Persist human-readable run state for long jobs and safe resume checks."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 # ---------------------------------------------------------------------------
-# Lógica de pares por chunk
+# Pair-count heuristic.
 # ---------------------------------------------------------------------------
 
 
@@ -232,14 +336,14 @@ def n_pairs_for_chunk(
     min_pairs: int,
     max_pairs: int,
 ) -> int:
-    """
-    Determina cuántos pares generar basándose en el tamaño y relevancia clínica del chunk.
+    """Choose how many QA pairs to request from a chunk.
 
-    Lógica:
-    - Chunks pequeños (<400 tokens)  → mínimo de pares.
-    - Chunks medianos (400-700)      → mínimo + 1.
-    - Chunks grandes (>700 tokens)   → máximo - 1.
-    - clinical_score >= 20           → +1 par extra (hasta el máximo).
+    The heuristic biases generation toward larger and clinically richer chunks
+    while respecting caller-provided limits:
+    - small chunks (<400 tokens) request the minimum;
+    - medium chunks (400-700 tokens) request one extra pair;
+    - large chunks (>700 tokens) request near the maximum;
+    - high clinical_score chunks get one additional pair, capped at max_pairs.
     """
     if token_estimate < 400:
         n = min_pairs
@@ -260,7 +364,7 @@ def estimate_cost(
     min_pairs: int,
     max_pairs: int,
 ) -> Tuple[int, float]:
-    """Devuelve (pares_esperados, costo_estimado_usd)."""
+    """Return the expected pair count and estimated generation cost in USD."""
     expected_pairs = sum(
         n_pairs_for_chunk(
             c.get("metadata", {}).get("token_estimate", 500),
@@ -283,18 +387,20 @@ def estimate_cost(
 
 
 # ---------------------------------------------------------------------------
-# Conversión a formato SFT
+# SFT record conversion.
 # ---------------------------------------------------------------------------
 
 
 def chunk_to_sft_records(
     chunk: Dict[str, Any],
     pairs: List[QAPar],
+    qualities: Optional[List[Optional[PairQuality]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Convierte los pares generados al formato messages listo para fine-tuning."""
+    """Convert generated QA pairs into chat-message records ready for fine-tuning."""
     meta = chunk.get("metadata", {})
     records = []
     for idx, pair in enumerate(pairs, start=1):
+        q = (qualities[idx - 1] if qualities and idx - 1 < len(qualities) else None)
         chunk_id = str(meta.get("chunk_id", ""))
         qa_id = f"{chunk_id}_qa_{idx:03d}" if chunk_id else f"qa_{idx:03d}"
         records.append(
@@ -320,6 +426,10 @@ def chunk_to_sft_records(
                     "tipo": pair.tipo,
                     "dificultad": pair.dificultad,
                     "contexto_fuente": pair.contexto_fuente,
+                    "faithfulness": q.faithfulness if q else None,
+                    "answer_relevancy": q.answer_relevancy if q else None,
+                    "roundtrip_consistency": q.roundtrip_consistency if q else None,
+                    "quality_verdict": q.verdict if q else None,
                 },
             }
         )
@@ -329,12 +439,14 @@ def chunk_to_sft_records(
 def chunk_to_raw_records(
     chunk: Dict[str, Any],
     pairs: List[QAPar],
+    qualities: Optional[List[Optional[PairQuality]]] = None,
 ) -> List[Dict[str, Any]]:
-    """Guarda los pares en formato plano para auditoría / revisión humana."""
+    """Convert generated QA pairs into flat audit records for human review."""
     meta = chunk.get("metadata", {})
     rows: List[Dict[str, Any]] = []
     chunk_id = str(meta.get("chunk_id", ""))
     for idx, p in enumerate(pairs, start=1):
+        q = (qualities[idx - 1] if qualities and idx - 1 < len(qualities) else None)
         qa_id = f"{chunk_id}_qa_{idx:03d}" if chunk_id else f"qa_{idx:03d}"
         rows.append(
             {
@@ -354,6 +466,11 @@ def chunk_to_raw_records(
                 "tipo": p.tipo,
                 "dificultad": p.dificultad,
                 "contexto_fuente": p.contexto_fuente,
+                "faithfulness": q.faithfulness if q else None,
+                "answer_relevancy": q.answer_relevancy if q else None,
+                "roundtrip_consistency": q.roundtrip_consistency if q else None,
+                "quality_verdict": q.verdict if q else None,
+                "quality_reason": q.reason if q else None,
             }
         )
     return rows
@@ -386,7 +503,7 @@ def grounding_metrics_for_pairs(pairs: List[QAPar]) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Generación asíncrona
+# Asynchronous generation.
 # ---------------------------------------------------------------------------
 
 
@@ -399,7 +516,7 @@ async def generate_for_chunk(
     semaphore: asyncio.Semaphore,
     logger: logging.Logger,
 ) -> Tuple[Dict[str, Any], List[QAPar], str]:
-    """Llama a la API para un único chunk. Incluye reintentos con backoff exponencial."""
+    """Call the API for a single chunk with exponential-backoff retries."""
     meta = chunk.get("metadata", {})
     chunk_id = meta.get("chunk_id", "unknown")
     n = n_pairs_for_chunk(
@@ -430,7 +547,7 @@ async def generate_for_chunk(
                     temperature=0.75,
                 )
 
-            # Verificar rechazo del modelo
+            # Treat model refusals as terminal for this chunk so resume does not retry them forever.
             choice = response.choices[0]
             if getattr(choice.message, "refusal", None):
                 logger.warning(
@@ -445,7 +562,7 @@ async def generate_for_chunk(
             return chunk, parsed.pares, "ok"
 
         except Exception as exc:
-            # Importar aquí para evitar dependencia en el top-level (puede no estar instalado aún)
+            # Import lazily so dry-runs and static inspection do not require the OpenAI package.
             try:
                 from openai import APIStatusError, RateLimitError
             except ImportError:
@@ -487,6 +604,107 @@ async def generate_for_chunk(
     return chunk, [], "failed"
 
 
+async def roundtrip_answer_for_pair(
+    client: Any,
+    model: str,
+    chunk_text: str,
+    question: str,
+) -> str:
+    response = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": ROUNDTRIP_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": ROUNDTRIP_USER_TEMPLATE.format(text=chunk_text, question=question),
+            },
+        ],
+    )
+    content = response.choices[0].message.content or ""
+    return content.strip()
+
+
+async def quality_for_pair(
+    client: Any,
+    pair: QAPar,
+    chunk_text: str,
+    verifier_model: str,
+) -> PairQuality:
+    rt_answer = await roundtrip_answer_for_pair(
+        client=client,
+        model=verifier_model,
+        chunk_text=chunk_text,
+        question=pair.pregunta,
+    )
+    response = await client.chat.completions.parse(
+        model=verifier_model,
+        messages=[
+            {"role": "system", "content": QUALITY_JUDGE_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": QUALITY_JUDGE_USER_TEMPLATE.format(
+                    context=chunk_text,
+                    question=pair.pregunta,
+                    answer=pair.respuesta,
+                    roundtrip_answer=rt_answer,
+                ),
+            },
+        ],
+        response_format=PairQuality,
+    )
+    parsed = response.choices[0].message.parsed
+    if parsed is None:
+        return PairQuality(
+            faithfulness=0.0,
+            answer_relevancy=0.0,
+            roundtrip_consistency=0.0,
+            verdict="reject",
+            reason="quality_parse_none",
+        )
+    return parsed
+
+
+async def evaluate_pairs_quality(
+    client: Any,
+    chunk: Dict[str, Any],
+    pairs: List[QAPar],
+    verifier_model: str,
+    min_faithfulness: float,
+    min_relevancy: float,
+    min_roundtrip: float,
+    logger: logging.Logger,
+) -> List[PairQuality]:
+    chunk_text = str(chunk.get("text", "")).strip()
+    qualities: List[PairQuality] = []
+    for pair in pairs:
+        try:
+            q = await quality_for_pair(
+                client=client,
+                pair=pair,
+                chunk_text=chunk_text,
+                verifier_model=verifier_model,
+            )
+            if (
+                q.faithfulness < min_faithfulness
+                or q.answer_relevancy < min_relevancy
+                or q.roundtrip_consistency < min_roundtrip
+            ):
+                q.verdict = "reject"
+            qualities.append(q)
+        except Exception as exc:
+            logger.warning("Fallo evaluación de calidad para una pareja QA: %s", exc)
+            qualities.append(
+                PairQuality(
+                    faithfulness=0.0,
+                    answer_relevancy=0.0,
+                    roundtrip_consistency=0.0,
+                    verdict="reject",
+                    reason=f"quality_eval_error: {exc}",
+                )
+            )
+    return qualities
+
+
 async def run_generation(
     chunks: List[Dict[str, Any]],
     client: Any,
@@ -498,22 +716,57 @@ async def run_generation(
     raw_output: Path,
     progress_file: Path,
     report_output: Path,
+    quality_eval_enabled: bool,
+    verifier_model: str,
+    min_faithfulness: float,
+    min_relevancy: float,
+    min_roundtrip: float,
+    quality_filter_enabled: bool,
     logger: logging.Logger,
 ) -> Dict[str, Any]:
     processed_ids = load_progress(progress_file)
+    recovered_from_raw = load_processed_ids_from_raw_output(raw_output)
+    if recovered_from_raw - processed_ids:
+        logger.info(
+            "Recuperados %d chunk_ids desde raw_output para reanudar sin duplicar.",
+            len(recovered_from_raw - processed_ids),
+        )
+        processed_ids |= recovered_from_raw
+        save_progress(progress_file, processed_ids)
 
-    # Solo procesar lo que no se haya procesado aún (resume-safe)
+    status_file = status_path_for_progress(progress_file)
+    started_at = time.time()
+
+    # Only schedule chunks that are not already complete; this keeps resume idempotent.
     pending = [
         c
         for c in chunks
         if c.get("metadata", {}).get("chunk_id", "") not in processed_ids
     ]
+    already_processed_at_start = len(processed_ids)
 
     logger.info(
         "Chunks totales: %d | Ya procesados: %d | Pendientes: %d",
         len(chunks),
         len(processed_ids),
         len(pending),
+    )
+
+    save_run_status(
+        status_file,
+        {
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "state": "running" if pending else "complete",
+            "total_chunks": len(chunks),
+            "already_processed_at_start": already_processed_at_start,
+            "pending_at_start": len(pending),
+            "processed_now": 0,
+            "failed_now": 0,
+            "qa_pairs_now": 0,
+            "raw_output": str(raw_output),
+            "sft_output": str(sft_output),
+            "progress_file": str(progress_file),
+        },
     )
 
     if not pending:
@@ -540,17 +793,56 @@ async def run_generation(
     grounding_overlap_sum = 0.0
     grounding_pairs = 0
     low_grounding_pairs = 0
+    quality_seen = 0
+    quality_accepted = 0
+    quality_faithfulness_sum = 0.0
+    quality_relevancy_sum = 0.0
+    quality_roundtrip_sum = 0.0
 
-    # as_completed para poder escribir y actualizar checkpoint en cuanto cada tarea termina
+    # Stream completed tasks so outputs and checkpoints are flushed as soon as each chunk finishes.
     for coro in atqdm(
         asyncio.as_completed(tasks), total=len(tasks), desc="Generando QA"
     ):
         chunk, pairs, status = await coro
         chunk_id = chunk.get("metadata", {}).get("chunk_id", "unknown")
+        last_status = status
 
         if pairs:
-            append_jsonl(sft_output, chunk_to_sft_records(chunk, pairs))
-            append_jsonl(raw_output, chunk_to_raw_records(chunk, pairs))
+            qualities: Optional[List[PairQuality]] = None
+            if quality_eval_enabled:
+                qualities = await evaluate_pairs_quality(
+                    client=client,
+                    chunk=chunk,
+                    pairs=pairs,
+                    verifier_model=verifier_model,
+                    min_faithfulness=min_faithfulness,
+                    min_relevancy=min_relevancy,
+                    min_roundtrip=min_roundtrip,
+                    logger=logger,
+                )
+                quality_seen += len(qualities)
+                quality_accepted += sum(1 for q in qualities if q.verdict == "accept")
+                quality_faithfulness_sum += sum(q.faithfulness for q in qualities)
+                quality_relevancy_sum += sum(q.answer_relevancy for q in qualities)
+                quality_roundtrip_sum += sum(q.roundtrip_consistency for q in qualities)
+                if quality_filter_enabled:
+                    kept_pairs: List[QAPar] = []
+                    kept_qualities: List[PairQuality] = []
+                    for pair, q in zip(pairs, qualities):
+                        if q.verdict == "accept":
+                            kept_pairs.append(pair)
+                            kept_qualities.append(q)
+                    pairs = kept_pairs
+                    qualities = kept_qualities
+
+            if not pairs:
+                failed += 1
+                processed_ids.add(chunk_id)
+                save_progress(progress_file, processed_ids)
+                continue
+
+            append_jsonl(sft_output, chunk_to_sft_records(chunk, pairs, qualities))
+            append_jsonl(raw_output, chunk_to_raw_records(chunk, pairs, qualities))
             gm = grounding_metrics_for_pairs(pairs)
             grounding_overlap_sum += float(gm["avg_context_answer_overlap"]) * int(gm["total_pairs"])
             grounding_pairs += int(gm["total_pairs"])
@@ -559,14 +851,63 @@ async def run_generation(
             total_pairs += len(pairs)
             processed_ids.add(chunk_id)
             save_progress(progress_file, processed_ids)
+            logger.info(
+                "Chunk completado %s | pares=%d | procesados ahora=%d | pendientes=%d",
+                chunk_id,
+                len(pairs),
+                processed,
+                max(0, len(pending) - processed - failed),
+            )
         elif status == "refused":
             failed += 1
             processed_ids.add(chunk_id)
             save_progress(progress_file, processed_ids)
+            logger.warning("Chunk omitido por rechazo del modelo: %s", chunk_id)
+        elif status == "ok":
+            # An empty list is a valid model response. Mark it processed to avoid
+            # retrying an unsupported/low-signal chunk indefinitely.
+            failed += 1
+            processed_ids.add(chunk_id)
+            save_progress(progress_file, processed_ids)
+            last_status = "empty"
+            logger.warning("Chunk sin pares generados: %s", chunk_id)
         else:
             failed += 1
+            logger.warning("Chunk fallido y reintentable al reanudar: %s", chunk_id)
+
+        elapsed = max(0.001, time.time() - started_at)
+        done_now = processed + failed
+        rate = done_now / elapsed
+        remaining = max(0, len(pending) - done_now)
+        eta_seconds = int(remaining / rate) if rate > 0 else None
+        save_run_status(
+            status_file,
+            {
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "state": "running" if done_now < len(pending) else "complete",
+                "total_chunks": len(chunks),
+                "already_processed_at_start": already_processed_at_start,
+                "pending_at_start": len(pending),
+                "processed_now": processed,
+                "failed_now": failed,
+                "completed_now": done_now,
+                "remaining_now": remaining,
+                "qa_pairs_now": total_pairs,
+                "last_chunk_id": chunk_id,
+                "last_status": last_status,
+                "elapsed_seconds": int(elapsed),
+                "eta_seconds": eta_seconds,
+                "raw_output": str(raw_output),
+                "sft_output": str(sft_output),
+                "progress_file": str(progress_file),
+            },
+        )
 
     stats = {
+        "models": {
+            "generator_model": model,
+            "verifier_model": verifier_model if quality_eval_enabled else None,
+        },
         "total": len(chunks),
         "skipped": len(chunks) - len(pending),
         "processed": processed,
@@ -577,6 +918,22 @@ async def run_generation(
             "low_grounding_pairs": low_grounding_pairs,
             "total_pairs": grounding_pairs,
             "low_grounding_rate": round(low_grounding_pairs / max(1, grounding_pairs), 4),
+        },
+        "quality": {
+            "enabled": quality_eval_enabled,
+            "verifier_model": verifier_model if quality_eval_enabled else None,
+            "pairs_evaluated": quality_seen,
+            "pairs_accepted": quality_accepted if quality_eval_enabled else None,
+            "acceptance_rate": round(quality_accepted / max(1, quality_seen), 4) if quality_eval_enabled else None,
+            "avg_faithfulness": round(quality_faithfulness_sum / max(1, quality_seen), 4) if quality_eval_enabled else None,
+            "avg_answer_relevancy": round(quality_relevancy_sum / max(1, quality_seen), 4) if quality_eval_enabled else None,
+            "avg_roundtrip_consistency": round(quality_roundtrip_sum / max(1, quality_seen), 4) if quality_eval_enabled else None,
+            "quality_filter_enabled": quality_filter_enabled if quality_eval_enabled else None,
+            "thresholds": {
+                "min_faithfulness": min_faithfulness if quality_eval_enabled else None,
+                "min_relevancy": min_relevancy if quality_eval_enabled else None,
+                "min_roundtrip": min_roundtrip if quality_eval_enabled else None,
+            },
         },
     }
     report_output.parent.mkdir(parents=True, exist_ok=True)
@@ -665,6 +1022,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Ignorar chunks con clinical_score menor a este valor.",
     )
+    parser.add_argument(
+        "--allowed-languages",
+        type=str,
+        default="es",
+        help="Idiomas permitidos para generar QA (coma-separados).",
+    )
     # Phase 7: content-role filtering for clinically useful QA generation
     CLINICAL_ROLES = ("evidence", "recommendation", "procedure", "diagnostic", "treatment")
     parser.add_argument(
@@ -707,6 +1070,41 @@ def parse_args() -> argparse.Namespace:
         default=42,
         help="Semilla aleatoria para reproducibilidad.",
     )
+    parser.add_argument(
+        "--enable-quality-eval",
+        action="store_true",
+        help="Activa evaluación de calidad por par (faithfulness, relevancy, roundtrip).",
+    )
+    parser.add_argument(
+        "--quality-verifier-model",
+        type=str,
+        default="gpt-5.4",
+        choices=SUPPORTED_MODELS,
+        help="Modelo verificador para evaluación de calidad.",
+    )
+    parser.add_argument(
+        "--quality-filter",
+        action="store_true",
+        help="Si se activa calidad, filtra y conserva solo pares QA aceptados.",
+    )
+    parser.add_argument(
+        "--min-faithfulness",
+        type=float,
+        default=0.80,
+        help="Umbral mínimo de faithfulness para aceptar un par QA.",
+    )
+    parser.add_argument(
+        "--min-relevancy",
+        type=float,
+        default=0.75,
+        help="Umbral mínimo de relevancy para aceptar un par QA.",
+    )
+    parser.add_argument(
+        "--min-roundtrip",
+        type=float,
+        default=0.75,
+        help="Umbral mínimo de consistencia roundtrip para aceptar un par QA.",
+    )
     return parser.parse_args()
 
 
@@ -743,6 +1141,37 @@ def chunk_metadata(chunk: Dict[str, Any]) -> Dict[str, Any]:
 
 def chunk_content_role(chunk: Dict[str, Any]) -> str:
     return str(chunk_metadata(chunk).get("content_role", "")).strip()
+
+
+def looks_spanish(text: str) -> bool:
+    """Lightweight Spanish detector used when metadata.language is missing."""
+    lowered = f" {str(text).lower()} "
+    score = 0
+    spanish_signals = [
+        " el ", " la ", " los ", " las ", " de ", " del ", " que ", " por ",
+        " para ", " con ", " una ", " uno ", " al ", " se ", " en ",
+    ]
+    for token in spanish_signals:
+        if token in lowered:
+            score += 1
+    if any(ch in lowered for ch in "áéíóúñü"):
+        score += 2
+    return score >= 4
+
+
+def language_matches(chunk: Dict[str, Any], allowed_languages: Set[str]) -> bool:
+    """Return whether a chunk passes the language filter, with metadata fallback."""
+    meta = chunk_metadata(chunk)
+    lang = str(meta.get("language", "")).strip().lower()
+    if lang:
+        return lang in allowed_languages
+
+    # When language metadata is absent, accept Spanish-looking chunks if Spanish is allowed.
+    if "es" in allowed_languages:
+        return looks_spanish(str(chunk.get("text", "")))
+
+    # Avoid aggressive filtering when the language is unknown and Spanish is not the target.
+    return True
 
 
 def filter_by_content_role(
@@ -854,6 +1283,20 @@ def main() -> None:
     chunks = read_jsonl(args.input)
     logger.info("Chunks cargados: %d desde %s", len(chunks), args.input)
 
+    allowed_languages = {x.strip().lower() for x in args.allowed_languages.split(",") if x.strip()}
+    if allowed_languages:
+        before = len(chunks)
+        chunks = [
+            c for c in chunks
+            if language_matches(c, allowed_languages)
+        ]
+        logger.info(
+            "Filtro language in %s: %d → %d chunks",
+            sorted(allowed_languages),
+            before,
+            len(chunks),
+        )
+
     # ── Filtrar por clinical_score si se pide ────────────────────────────────
     if args.min_clinical_score > 0:
         before = len(chunks)
@@ -892,7 +1335,7 @@ def main() -> None:
     else:
         logger.info("Filtro por content_role deshabilitado (--no-content-role-filter).")
 
-    # Reportar distribución de topics tras filtro
+    # Log topic coverage after filtering so quality regressions are easy to spot.
     topic_dist = compute_topic_distribution(chunks)
     if topic_dist:
         logger.info("Topics tras filtro: %s", dict(sorted(topic_dist.items())))
@@ -909,7 +1352,7 @@ def main() -> None:
         chunks = chunks[: args.limit]
         logger.info("Limitando chunks: %d → %d", before, len(chunks))
 
-    # ── Estimación de costo y estadísticas ──────────────────────────────────
+    # ── Cost estimate and run summary ────────────────────────────────────────
     expected_pairs, cost_est = estimate_cost(
         chunks, args.model, args.min_pairs, args.max_pairs
     )
@@ -934,6 +1377,16 @@ def main() -> None:
     print(f"  Pares esperados    : ~{expected_pairs}")
     print(f"  Costo estimado     : ~${cost_est:.2f} USD")
     print(f"  Concurrencia       : {args.concurrency} peticiones simultáneas")
+    print(f"  Quality eval       : {'ON' if args.enable_quality_eval else 'OFF'}")
+    if args.enable_quality_eval:
+        print(f"  Verifier model     : {args.quality_verifier_model}")
+        print(
+            "  Thresholds QA      : "
+            f"faithfulness>={args.min_faithfulness:.2f}, "
+            f"relevancy>={args.min_relevancy:.2f}, "
+            f"roundtrip>={args.min_roundtrip:.2f}"
+        )
+        print(f"  Quality filter     : {'ON' if args.quality_filter else 'OFF'}")
     print(f"  Salida SFT         : {args.sft_output}")
     print(f"  Salida raw         : {args.raw_output}")
     print(f"  Reporte QA         : {args.report_output}")
@@ -945,7 +1398,7 @@ def main() -> None:
         logger.info("Modo dry-run: no se llamó a la API.")
         return
 
-    # ── Ejecutar generación ──────────────────────────────────────────────────
+    # ── Execute generation ───────────────────────────────────────────────────
     try:
         from openai import AsyncOpenAI
     except ImportError:
@@ -967,6 +1420,12 @@ def main() -> None:
             raw_output=args.raw_output,
             progress_file=args.progress_file,
             report_output=args.report_output,
+            quality_eval_enabled=args.enable_quality_eval,
+            verifier_model=args.quality_verifier_model,
+            min_faithfulness=args.min_faithfulness,
+            min_relevancy=args.min_relevancy,
+            min_roundtrip=args.min_roundtrip,
+            quality_filter_enabled=args.quality_filter,
             logger=logger,
         )
     )
@@ -986,6 +1445,18 @@ def main() -> None:
         f"{stats['grounding']['avg_context_answer_overlap']:.3f} "
         f"(bajo={stats['grounding']['low_grounding_rate']:.1%})"
     )
+    if stats.get("quality", {}).get("enabled"):
+        print(
+            "  Quality (avg)      : "
+            f"faith={stats['quality']['avg_faithfulness']:.3f} | "
+            f"rel={stats['quality']['avg_answer_relevancy']:.3f} | "
+            f"rt={stats['quality']['avg_roundtrip_consistency']:.3f}"
+        )
+        print(
+            "  Quality acceptance : "
+            f"{stats['quality']['pairs_accepted']}/{stats['quality']['pairs_evaluated']} "
+            f"({stats['quality']['acceptance_rate']:.1%})"
+        )
     print(f"  Tiempo             : {elapsed:.0f}s")
     print(f"  SFT output         : {args.sft_output}")
     print(f"  Raw output         : {args.raw_output}")

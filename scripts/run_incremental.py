@@ -12,8 +12,11 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from utils import (
     default_artifacts_dir,
+    default_corpus_dir,
     default_datasets_dir,
+    default_metadata_dir,
     default_pdfs_dir,
+    default_reports_dir,
     dedupe_chunks,
     enrich_chunks,
     filter_lm_chunks,
@@ -106,7 +109,11 @@ def load_manifest(path: Path, pdfs: Sequence[Path]) -> Dict[str, Dict[str, Any]]
             return {str(k): v for k, v in records.items() if isinstance(v, dict)}
 
     # Bootstrap from existing artifacts so the first incremental run does not reprocess old PDFs.
-    raw_pages = path.parent / "raw_pages.jsonl"
+    raw_pages = (
+        path.parent.parent / "corpus" / "raw_pages.jsonl"
+        if path.parent.name == "metadata"
+        else path.parent / "raw_pages.jsonl"
+    )
     if raw_pages.exists():
         existing_paths = {str(row.get("source_path", "")) for row in read_jsonl(raw_pages)}
         manifest: Dict[str, Dict[str, Any]] = {}
@@ -210,18 +217,24 @@ def write_manifest(path: Path, pdfs: Sequence[Path], previous: Dict[str, Dict[st
 def main() -> None:
     args = parse_args()
     artifacts_dir = args.artifacts_dir
+    corpus_dir = default_corpus_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "corpus"
+    metadata_dir = default_metadata_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "metadata"
+    reports_dir = default_reports_dir() if args.artifacts_dir == default_artifacts_dir() else artifacts_dir / "reports"
     datasets_dir = args.datasets_dir
     lm_dir = datasets_dir / "lm"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
+    corpus_dir.mkdir(parents=True, exist_ok=True)
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
     lm_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_pages = artifacts_dir / "raw_pages.jsonl"
-    clean_pages = artifacts_dir / "clean_pages.jsonl"
-    chunks = artifacts_dir / "chunks.jsonl"
+    raw_pages = corpus_dir / "raw_pages.jsonl"
+    clean_pages = corpus_dir / "clean_pages.jsonl"
+    chunks = corpus_dir / "chunks.jsonl"
     train = lm_dir / "train_lm.jsonl"
     validation = lm_dir / "validation_lm.jsonl"
     test = lm_dir / "test_lm.jsonl"
-    manifest_path = artifacts_dir / "processed_pdfs_manifest.json"
+    manifest_path = metadata_dir / "processed_pdfs_manifest.json"
     incremental_dir = artifacts_dir / "_incremental"
 
     pdfs = discover_pdfs(args.input_dir, args.recursive)
@@ -288,6 +301,8 @@ def main() -> None:
             "scripts/build_lm_dataset.py",
             "--input",
             str(new_clean),
+            "--inventory",
+            str(new_inventory),
             "--chunks-output",
             str(new_chunks),
             "--train-output",
@@ -364,7 +379,7 @@ def main() -> None:
             "--test",
             str(test),
             "--output",
-            str(artifacts_dir / "audit_report.json"),
+            str(reports_dir / "audit_report.json"),
             "--samples-per-pdf",
             str(args.samples_per_pdf),
             "--seed",
