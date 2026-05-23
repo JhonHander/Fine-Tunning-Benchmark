@@ -2,7 +2,7 @@
 
 <img src="./public/app-icon.png" alt="Logo" width="140" height="140" />
 
-# Fine-Tuning Benchmark
+MaternaQA-es
 
 **Pipeline completo para generación de QA clínico en español y fine-tuning con QLoRA**
 
