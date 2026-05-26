@@ -10,6 +10,10 @@ Typical smoke test:
         --train-limit 64 \
         --eval-limit 32
 
+The trainer converts the published conversational JSONL files to TRL's
+prompt/completion format in memory. This keeps loss masking explicit and avoids
+depending on model-specific chat templates that may not expose assistant masks.
+
 The script intentionally avoids installing dependencies or logging in to
 Hugging Face. Install `requirements.txt`, run `huggingface-cli login`, and
 accept gated model terms before launching training on the workstation.
@@ -29,8 +33,8 @@ DATASET_VARIANTS = ("sft_closed_book", "sft_grounded")
 SPLITS = ("train", "validation", "test")
 
 
-def import_training_stack() -> dict[str, Any]:
-    """Import optional fine-tuning dependencies with an actionable error."""
+def remove_project_root_from_imports() -> None:
+    """Avoid shadowing installed packages with top-level artifact folders."""
     # The repository has a top-level `datasets/` directory for data artifacts.
     # Remove the project root from import lookup so it cannot shadow the
     # Hugging Face `datasets` package when this script is run from repo root.
@@ -41,6 +45,24 @@ def import_training_stack() -> dict[str, Any]:
         if entry
         and Path(entry).resolve() != project_root
     ]
+
+
+def import_dataset_loader() -> Any:
+    """Import the minimal dependency needed for dataset validation."""
+    remove_project_root_from_imports()
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise SystemExit(
+            "Falta la dependencia `datasets`. Instala primero `requirements.txt`. "
+            f"Error original: {exc}"
+        ) from exc
+    return load_dataset
+
+
+def import_training_stack() -> dict[str, Any]:
+    """Import optional fine-tuning dependencies with an actionable error."""
+    remove_project_root_from_imports()
     try:
         import torch
         from datasets import load_dataset
@@ -132,17 +154,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--assistant-only-loss",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help=(
-            "Calcula pérdida solo sobre turnos assistant. Si el template del modelo falla, "
-            "reintenta con --no-assistant-only-loss."
+            "Modo avanzado: usa máscaras del chat template para calcular pérdida solo "
+            "sobre assistant. Requiere templates con {%% generation %%}. Por defecto se "
+            "usa prompt/completion y completion_only_loss=True."
         ),
     )
     parser.add_argument(
         "--packing",
         action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Empaqueta secuencias cortas para mejorar uso de GPU.",
+        default=False,
+        help=(
+            "Empaqueta secuencias cortas para mejorar uso de GPU. Por defecto está "
+            "desactivado para evitar contaminación entre muestras si la atención del "
+            "modelo no soporta packing seguro."
+        ),
     )
     parser.add_argument(
         "--gradient-checkpointing",
@@ -172,6 +199,29 @@ def parse_args() -> argparse.Namespace:
         help="Permite dry-runs sin CUDA. QLoRA real requiere GPU NVIDIA/CUDA.",
     )
     return parser.parse_args()
+
+
+def split_prompt_completion(example: dict[str, Any]) -> dict[str, Any]:
+    """Convert a messages row to TRL conversational prompt/completion format."""
+    messages = example.get("messages")
+    if not isinstance(messages, list):
+        raise ValueError("Cada ejemplo debe contener una lista `messages`.")
+
+    assistant_indices = [
+        index
+        for index, message in enumerate(messages)
+        if isinstance(message, dict) and message.get("role") == "assistant"
+    ]
+    if not assistant_indices:
+        raise ValueError("Cada ejemplo debe contener al menos un mensaje assistant.")
+
+    completion_start = assistant_indices[-1]
+    prompt = messages[:completion_start]
+    completion = messages[completion_start:]
+    if not prompt:
+        raise ValueError("Cada ejemplo debe contener mensajes previos al assistant.")
+
+    return {"prompt": prompt, "completion": completion}
 
 
 def resolve_model_class(model_name: str, requested: str) -> Literal["causal-lm", "image-text-to-text"]:
@@ -205,14 +255,21 @@ def dataset_files(dataset_root: Path, variant: str) -> dict[str, str]:
     return files
 
 
-def keep_messages_only(dataset: Any) -> Any:
+def keep_prompt_completion_only(dataset: Any) -> Any:
     """Drop metadata before TRL preprocessing to keep the training schema minimal."""
     columns_to_remove = [
-        column for column in dataset.column_names if column != "messages"
+        column for column in dataset.column_names if column not in {"prompt", "completion"}
     ]
     if not columns_to_remove:
         return dataset
     return dataset.remove_columns(columns_to_remove)
+
+
+def to_prompt_completion(dataset: Any) -> Any:
+    """Use explicit completion boundaries instead of tokenizer assistant masks."""
+    return keep_prompt_completion_only(
+        dataset.map(split_prompt_completion, desc="Construyendo prompt/completion")
+    )
 
 
 def maybe_limit(dataset: Any, limit: int | None) -> Any:
@@ -230,9 +287,9 @@ def load_sft_datasets(args: argparse.Namespace, load_dataset: Any) -> tuple[Any,
         "json",
         data_files=dataset_files(args.dataset_root, args.dataset_variant),
     )
-    train_dataset = keep_messages_only(maybe_limit(dataset["train"], args.train_limit))
-    eval_dataset = keep_messages_only(maybe_limit(dataset["validation"], args.eval_limit))
-    test_dataset = keep_messages_only(dataset["test"])
+    train_dataset = to_prompt_completion(maybe_limit(dataset["train"], args.train_limit))
+    eval_dataset = to_prompt_completion(maybe_limit(dataset["validation"], args.eval_limit))
+    test_dataset = to_prompt_completion(dataset["test"])
     return train_dataset, eval_dataset, test_dataset
 
 
@@ -302,6 +359,13 @@ def build_peft_config(args: argparse.Namespace, stack: dict[str, Any]) -> Any:
 
 def build_training_args(args: argparse.Namespace, stack: dict[str, Any]) -> Any:
     """Create SFTConfig with conservative defaults for a 16GB VRAM workstation."""
+    if args.assistant_only_loss:
+        raise SystemExit(
+            "`--assistant-only-loss` requiere un chat template con {% generation %}. "
+            "Este script usa por defecto prompt/completion con `completion_only_loss=True`, "
+            "que es más estable para Gemma/MedGemma. Ejecuta sin `--assistant-only-loss`."
+        )
+
     torch = stack["torch"]
     SFTConfig = stack["SFTConfig"]
     dtype = resolve_dtype(torch)
@@ -310,7 +374,8 @@ def build_training_args(args: argparse.Namespace, stack: dict[str, Any]) -> Any:
         "output_dir": str(args.output_dir),
         "max_length": args.max_length,
         "packing": args.packing,
-        "assistant_only_loss": args.assistant_only_loss,
+        "completion_only_loss": True,
+        "assistant_only_loss": False,
         "num_train_epochs": args.num_train_epochs,
         "per_device_train_batch_size": args.per_device_train_batch_size,
         "per_device_eval_batch_size": args.per_device_eval_batch_size,
@@ -345,10 +410,15 @@ def build_training_args(args: argparse.Namespace, stack: dict[str, Any]) -> Any:
 
 def main() -> None:
     args = parse_args()
-    stack = import_training_stack()
+    stack: dict[str, Any] | None = None
+    if args.dry_run:
+        load_dataset = import_dataset_loader()
+    else:
+        stack = import_training_stack()
+        load_dataset = stack["load_dataset"]
     train_dataset, eval_dataset, test_dataset = load_sft_datasets(
         args,
-        stack["load_dataset"],
+        load_dataset,
     )
 
     print(
@@ -360,12 +430,15 @@ def main() -> None:
             "test_holdout": len(test_dataset),
         },
     )
-    print("Ejemplo messages:", train_dataset[0]["messages"])
+    print("Ejemplo prompt:", train_dataset[0]["prompt"])
+    print("Ejemplo completion:", train_dataset[0]["completion"])
 
     if args.dry_run:
         print("Dry-run completado: no se cargó modelo ni se entrenó.")
         return
 
+    if stack is None:
+        stack = import_training_stack()
     model, tokenizer = load_model_and_tokenizer(args, stack)
     training_args = build_training_args(args, stack)
     peft_config = build_peft_config(args, stack)

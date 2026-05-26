@@ -69,9 +69,18 @@ En ambas rutas, `train.jsonl` se pasa como `train_dataset`, `validation.jsonl` c
 El repositorio incluye `scripts/train_qlora_trl.py` para ejecutar la ruta canónica `TRL + PEFT + bitsandbytes (QLoRA)`.
 El script no instala dependencias ni hace login en Hugging Face; antes de entrenar, instala `requirements.txt`, ejecuta `huggingface-cli login` y acepta los términos de acceso de los modelos de Google/MedGemma.
 
-Ejemplo de smoke test con pocos pasos:
+Los JSONL publicados mantienen el formato conversacional `messages` para ser fáciles de auditar y reutilizar. Durante el entrenamiento, el script los transforma en memoria a formato `prompt`/`completion`; TRL calcula la pérdida solo sobre `completion`, sin depender de máscaras `assistant` del chat template del tokenizer.
+
+> **Flujo recomendado**: primero un smoke test para validar que carga, entrena y guarda. Después el fine-tuning real sobre el dataset completo.
+
+---
+
+### Smoke test (validación rápida)
+
+Entrena 10 pasos con pocos ejemplos. Sirve para verificar que la configuración funciona.
 
 ```bash
+# Gemma 4 E2B
 python scripts/train_qlora_trl.py \
   --model-name google/gemma-4-E2B-it \
   --dataset-variant sft_grounded \
@@ -79,15 +88,49 @@ python scripts/train_qlora_trl.py \
   --max-steps 10 \
   --train-limit 64 \
   --eval-limit 32
+
+# MedGemma 1.5 4B IT
+python scripts/train_qlora_trl.py \
+  --model-name google/medgemma-1.5-4b-it \
+  --dataset-variant sft_grounded \
+  --output-dir outputs/smoke-medgemma-grounded \
+  --max-steps 10 \
+  --train-limit 64 \
+  --eval-limit 32
 ```
 
-Ejemplo de entrenamiento closed-book cambiando solo la variante:
+Si MedGemma falla con error de arquitectura, agregá `--model-class causal-lm`.
+
+---
+
+### Fine-tuning real (dataset completo)
+
+Sin flags limitantes, entrena con los defaults del script (2 épocas, batch 8, QLoRA). El `packing` está desactivado por defecto para evitar contaminación entre muestras en modelos cuya atención no soporte empaquetado seguro.
 
 ```bash
+# Gemma 4 — grounded
+python scripts/train_qlora_trl.py \
+  --model-name google/gemma-4-E2B-it \
+  --dataset-variant sft_grounded \
+  --output-dir outputs/gemma4-e2b-grounded
+
+# Gemma 4 — closed-book
 python scripts/train_qlora_trl.py \
   --model-name google/gemma-4-E2B-it \
   --dataset-variant sft_closed_book \
-  --output-dir outputs/gemma4-e2b-closed-book-qlora
+  --output-dir outputs/gemma4-e2b-closed-book
+
+# MedGemma 1.5 — grounded
+python scripts/train_qlora_trl.py \
+  --model-name google/medgemma-1.5-4b-it \
+  --dataset-variant sft_grounded \
+  --output-dir outputs/medgemma-grounded
+
+# MedGemma 1.5 — closed-book
+python scripts/train_qlora_trl.py \
+  --model-name google/medgemma-1.5-4b-it \
+  --dataset-variant sft_closed_book \
+  --output-dir outputs/medgemma-closed-book
 ```
 
 ## Carga mínima
