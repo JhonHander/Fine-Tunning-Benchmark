@@ -178,19 +178,93 @@ python scripts/generate_synthetic_qa.py \
   --max-pairs 5
 ```
 
-### 4. Entrenamiento experimental opcional
+### 4. Fine-tuning con QLoRA
 
-El repositorio también incluye un script para smoke tests de fine-tuning con QLoRA sobre las variantes publicadas.
+El dataset ya está listo para entrenar. Solo necesitás elegir modelo, cumplir los requisitos y ejecutar.
 
+El script lee las variantes publicadas en formato chat (`messages`) y las convierte internamente a `prompt`/`completion` antes de entrenar. Así la pérdida se calcula solo sobre la respuesta esperada sin depender de máscaras del chat template del modelo, que en Gemma/MedGemma pueden no estar disponibles.
+
+#### ¿Qué variante elijo?
+
+| Variante | Qué recibe el modelo | Cuándo usarla |
+|---|---|---|
+| `sft_grounded` | contexto clínico + pregunta → respuesta | Querés que el modelo razone sobre evidencia. **Empezá por acá.** |
+| `sft_closed_book` | solo pregunta → respuesta | Querés medir cuánto internaliza el dominio sin ayuda. |
+
+#### Requisitos
+
+Antes de ejecutar asegurate de tener esto:
+
+- [ ] `pip install -r requirements.txt`
+- [ ] `huggingface-cli login` o `export HF_TOKEN=<tu_token>`
+- [ ] Aceptar los términos del modelo en huggingface.co (Gemma 4 y MedGemma son gated)
+- [ ] GPU NVIDIA con ≥ 16 GB VRAM (si tenés menos, probablemente no entre)
+
+---
+
+#### Paso 1 — Smoke test (~3 min)
+
+Valida que todo carga y entrena sin errores. Solo 10 pasos con pocos ejemplos.
+
+**Gemma 4 E2B:**
 ```bash
 python scripts/train_qlora_trl.py \
   --model-name google/gemma-4-E2B-it \
   --dataset-variant sft_grounded \
-  --output-dir outputs/smoke-test \
+  --output-dir outputs/smoke-gemma4 \
   --max-steps 10 \
   --train-limit 64 \
   --eval-limit 32
 ```
+
+**MedGemma 1.5 4B:**
+```bash
+python scripts/train_qlora_trl.py \
+  --model-name google/medgemma-1.5-4b-it \
+  --dataset-variant sft_grounded \
+  --output-dir outputs/smoke-medgemma \
+  --max-steps 10 \
+  --train-limit 64 \
+  --eval-limit 32
+```
+
+> Si MedGemma falla con error de arquitectura, agregá `--model-class causal-lm`.
+
+#### Paso 2 — Entrenamiento real (~2–4 h según GPU)
+
+Sin flags limitantes. Entrena sobre los 5093 pares del dataset con 2 épocas.
+
+**Gemma 4 E2B:**
+```bash
+# Grounded (recomendado)
+python scripts/train_qlora_trl.py \
+  --model-name google/gemma-4-E2B-it \
+  --dataset-variant sft_grounded \
+  --output-dir outputs/gemma4-grounded
+
+# Closed-book
+python scripts/train_qlora_trl.py \
+  --model-name google/gemma-4-E2B-it \
+  --dataset-variant sft_closed_book \
+  --output-dir outputs/gemma4-closed-book
+```
+
+**MedGemma 1.5 4B:**
+```bash
+# Grounded (recomendado)
+python scripts/train_qlora_trl.py \
+  --model-name google/medgemma-1.5-4b-it \
+  --dataset-variant sft_grounded \
+  --output-dir outputs/medgemma-grounded
+
+# Closed-book
+python scripts/train_qlora_trl.py \
+  --model-name google/medgemma-1.5-4b-it \
+  --dataset-variant sft_closed_book \
+  --output-dir outputs/medgemma-closed-book
+```
+
+> **¿Qué va a pasar?** El script carga el modelo en 4 bits, entrena adapters LoRA (r=16) sobre todas las capas lineales, calcula pérdida solo sobre `completion`, y guarda solo los adapters en `output-dir/`. El modelo base no se modifica. Revisá `python scripts/train_qlora_trl.py --help` para ajustar hiperparámetros.
 
 ## Estructura del repositorio
 
