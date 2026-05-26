@@ -135,6 +135,8 @@ El repositorio incluye `scripts/train_qlora_trl.py` para ejecutar fine-tuning su
 
 La variante `sft_grounded` es la más alineada con asistentes clínicos que deben responder usando evidencia provista. La variante `sft_closed_book` permite medir cuánto conocimiento del dominio queda internalizado por el modelo.
 
+Para entrenamiento con TRL, el script conserva los JSONL publicables en formato `messages`, pero los transforma en memoria a `prompt`/`completion`. Esta decisión hace explícito el límite supervisado: el prompt contiene sistema, contexto y pregunta; la completion contiene la respuesta objetivo. Así se evita depender de máscaras `assistant` generadas por chat templates específicos del tokenizer.
+
 ## 11. Limitaciones y Controles Pendientes
 
 El pipeline ya registra páginas con necesidad de OCR, pero no ejecuta OCR real. También conviene complementar las métricas automáticas con revisión clínica humana, especialmente sobre:
